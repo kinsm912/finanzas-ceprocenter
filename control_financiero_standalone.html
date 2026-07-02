@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finanzas Cepro">
+<title>Ceprocenter · Control Financiero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #EEF0F5; --panel: #FFFFFF; --panel-2: #F5F6FA; --line: #DEE2EA;
+    --accent: #5B63D3; --accent-soft: rgba(91,99,211,0.10); --accent-dark: #454CB8;
+    --text: #24273A; --text-dim: #767C93;
+    --warn: #C98A3C; --warn-soft: rgba(201,138,60,0.12);
+    --danger: #D9614F; --danger-soft: rgba(217,97,79,0.10);
+    --radius: 12px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Nunito',sans-serif;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:'Quicksand',sans-serif;letter-spacing:0.01em;}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
+  .top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:22px;border-bottom:1px solid var(--line);padding-bottom:18px;}
+  .top h1{font-size:27px;font-weight:700;margin:0;color:var(--text);}
+  .top .sub{color:var(--text-dim);font-size:13.5px;margin-top:4px;}
+  .accent{color:var(--accent);}
+  .ticker{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:24px;}
+  .tick{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:0 1px 2px rgba(36,39,58,0.04);}
+  .tick .n{font-family:'Quicksand',sans-serif;font-size:23px;font-weight:700;color:var(--accent);}
+  .tick .n.neg{color:var(--danger);} .tick .n.warn{color:var(--warn);}
+  .tick .l{font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-dim);margin-top:2px;}
+  .tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .tab{background:none;border:none;color:var(--text-dim);font-family:'Quicksand',sans-serif;font-size:15.5px;font-weight:600;padding:10px 6px;cursor:pointer;border-bottom:2px solid transparent;margin-right:22px;}
+  .tab.active{color:var(--text);border-bottom-color:var(--accent);}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:18px;box-shadow:0 1px 2px rgba(36,39,58,0.03);}
+  .panel h2{font-size:19px;margin:0 0 4px;color:var(--text);}
+  .panel .hint{color:var(--text-dim);font-size:12.5px;margin:0 0 18px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid.cols3{grid-template-columns:1fr 1fr 1fr;}
+  @media(max-width:640px){.grid,.grid.cols3{grid-template-columns:1fr;}}
+  .field label{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-dim);margin-bottom:6px;}
+  .field input, .field select{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:10px 11px;color:var(--text);font-family:'Nunito',sans-serif;font-size:14px;}
+  .field input:focus, .field select:focus{outline:none;border-color:var(--accent);}
+  .btn{font-family:'Quicksand',sans-serif;font-size:14.5px;font-weight:700;border-radius:9px;padding:11px 20px;border:1px solid transparent;cursor:pointer;}
+  .btn-primary{background:var(--accent);color:#fff;} .btn-primary:hover{background:var(--accent-dark);}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--text);} .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-sm{padding:7px 13px;font-size:13px;}
+  .actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;font-family:'Quicksand',sans-serif;text-transform:uppercase;letter-spacing:0.04em;font-size:11.5px;color:var(--text-dim);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  tr:hover td{background:var(--panel-2);}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .table-scroll{overflow-x:auto;}
+  tfoot td{border-top:1px solid var(--accent);border-bottom:none;font-weight:700;color:var(--accent);}
+  .filters{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;}
+  .filters .field{min-width:150px;}
+  .empty{text-align:center;padding:40px 20px;color:var(--text-dim);font-size:13.5px;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:#fff;padding:12px 20px;border-radius:9px;font-size:13.5px;opacity:0;transition:all 0.25s ease;pointer-events:none;z-index:100;max-width:88%;text-align:center;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .pill{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;text-transform:uppercase;font-weight:700;}
+  .pill.ok{background:var(--accent-soft);color:var(--accent);}
+  .pill.debt{background:var(--danger-soft);color:var(--danger);}
+  .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .bar-label{width:220px;font-size:13px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bar-track{flex:1;background:var(--panel-2);border-radius:6px;height:22px;overflow:hidden;}
+  .bar-fill{background:var(--accent);height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;}
+  .bar-fill span{font-size:11px;color:#fff;font-weight:700;white-space:nowrap;}
+  .bar-count{width:60px;text-align:right;font-size:12px;color:var(--text-dim);flex-shrink:0;}
+  .report-box{background:var(--panel-2);border:1px dashed var(--accent);border-radius:9px;padding:18px;font-size:13px;line-height:1.8;white-space:pre-wrap;color:var(--text);margin-top:10px;}
+  .setup-banner{background:var(--warn-soft);border:1px solid var(--warn);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;}
+  .setup-banner h3{margin:0 0 8px;color:var(--warn);font-size:16px;}
+  .setup-banner input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);margin:8px 0;font-family:'Nunito',sans-serif;font-size:13px;}
+  @media print{ .tabs, .actions, .filters, .top .sub{display:none !important;} body{background:#fff;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div>
+      <h1>Control Financiero <span class="accent">/ Ceprocenter</span></h1>
+      <div class="sub">Versión independiente — datos guardados en tu Google Sheet.</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="btn_config">⚙ Configuración</button>
+  </div>
+
+  <div class="setup-banner" id="setup_banner" style="display:none;">
+    <h3>Configura tu conexión</h3>
+    <p class="hint" style="margin:0 0 6px;">Pega aquí la URL de tu Apps Script (termina en /exec). Se guarda solo en este dispositivo/navegador.</p>
+    <input id="api_url_input" placeholder="https://script.google.com/macros/s/xxxxx/exec">
+    <button class="btn btn-primary btn-sm" id="btn_guardar_config">Guardar y Conectar</button>
+  </div>
+
+  <div id="app_content" style="display:none;">
+    <div class="ticker" id="ticker"></div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="resumen">Resumen</button>
+      <button class="tab" data-tab="ingresos">Ventas</button>
+      <button class="tab" data-tab="gastos">Gastos</button>
+      <button class="tab" data-tab="deudas">Deudas</button>
+      <button class="tab" data-tab="capital">Capital</button>
+      <button class="tab" data-tab="reporte">Reporte</button>
+    </div>
+
+    <div id="tab-resumen">
+      <div class="panel">
+        <h2>Curso Más Vendido</h2>
+        <div id="ranking_cursos"></div>
+        <div class="empty" id="ranking_empty" style="display:none;">Aún no hay ventas registradas.</div>
+      </div>
+      <div class="panel">
+        <h2>Últimos 6 Meses</h2>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Mes</th><th class="num">Ventas</th><th class="num">Gastos</th><th class="num">Utilidad</th></tr></thead>
+          <tbody id="tabla_meses"></tbody>
+        </table></div>
+      </div>
+      <div class="panel">
+        <h2>Pendientes de Confirmar en Banco</h2>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Fecha</th><th>Detalle</th><th>Curso</th><th>Cuenta</th><th class="num">Monto</th><th></th></tr></thead>
+          <tbody id="tabla_pendientes"></tbody>
+        </table></div>
+        <div class="empty" id="pendientes_empty" style="display:none;">Todo confirmado. Sin pendientes.</div>
+      </div>
+    </div>
+
+    <div id="tab-ingresos" style="display:none;">
+      <div class="panel">
+        <h2>Registrar Venta</h2>
+        <div class="grid cols3">
+          <div class="field"><label>Fecha</label><input id="i_fecha" type="date"></div>
+          <div class="field"><label>Concepto</label><select id="i_tipo">
+            <option>Inscripción</option><option>Masterclass</option><option>Diplomado</option><option>Entrenamiento</option><option>Seminario</option>
+          </select></div>
+          <div class="field"><label>Curso / Programa</label><input id="i_curso" placeholder="Ej. Diplomado de TDAH"></div>
+          <div class="field"><label>Estudiante / Detalle</label><input id="i_concepto" placeholder="Nombre o detalle"></div>
+          <div class="field"><label>Vendido por</label><select id="i_asesor"><option>Jose</option><option>Sara</option><option>Directo</option></select></div>
+          <div class="field"><label>Cuenta Bancaria</label><select id="i_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Otro</option></select></div>
+          <div class="field"><label>Monto Vendido ($)</label><input id="i_monto" type="number" step="0.01" placeholder="0.00"></div>
+          <div class="field"><label>Estado</label><select id="i_confirmado"><option value="no">Pendiente</option><option value="si">Confirmado</option></select></div>
+        </div>
+        <div class="actions"><button class="btn btn-primary" id="btn_guardar_ingreso">Guardar Venta</button></div>
+      </div>
+      <div class="panel">
+        <h2>Historial de Ventas</h2>
+        <div class="filters">
+          <div class="field"><label>Mes</label><input type="month" id="filt_i_mes"></div>
+          <div class="field"><label>Estado</label><select id="filt_i_estado"><option value="">Todos</option><option value="no">Pendientes</option><option value="si">Confirmados</option></select></div>
+          <button class="btn btn-ghost btn-sm" id="btn_filtrar_ingresos">Aplicar</button>
+        </div>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Fecha</th><th>Concepto</th><th>Curso</th><th>Vendido por</th><th>Cuenta</th><th class="num">Monto</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="tabla_ingresos"></tbody>
+          <tfoot><tr><td colspan="5">TOTAL</td><td class="num" id="tot_ingresos">$0.00</td><td colspan="2"></td></tr></tfoot>
+        </table></div>
+        <div class="empty" id="ingresos_empty" style="display:none;">No hay ventas con este filtro.</div>
+      </div>
+    </div>
+
+    <div id="tab-gastos" style="display:none;">
+      <div class="panel">
+        <h2>Registrar Gasto</h2>
+        <div class="grid cols3">
+          <div class="field"><label>Fecha</label><input id="g_fecha" type="date"></div>
+          <div class="field"><label>Categoría</label><select id="g_categoria">
+            <option>Sueldos</option><option>Diseñador</option><option>Comisiones</option><option>Arriendo</option><option>Publicidad</option><option>Contador</option><option>Softwares varios</option><option>Pago a Tutores</option><option>Gasto de Curso</option><option>Otros</option>
+          </select></div>
+          <div class="field"><label>Cuenta Bancaria</label><select id="g_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Otro</option></select></div>
+          <div class="field"><label>Descripción</label><input id="g_descripcion" placeholder="Detalle del gasto"></div>
+          <div class="field"><label>Monto ($)</label><input id="g_monto" type="number" step="0.01" placeholder="0.00"></div>
+        </div>
+        <div class="actions"><button class="btn btn-primary" id="btn_guardar_gasto">Guardar Gasto</button></div>
+      </div>
+      <div class="panel">
+        <h2>Historial de Gastos</h2>
+        <div class="filters">
+          <div class="field"><label>Mes</label><input type="month" id="filt_g_mes"></div>
+          <div class="field"><label>Categoría</label><select id="filt_g_categoria"><option value="">Todas</option><option>Sueldos</option><option>Diseñador</option><option>Comisiones</option><option>Arriendo</option><option>Publicidad</option><option>Contador</option><option>Softwares varios</option><option>Pago a Tutores</option><option>Gasto de Curso</option><option>Otros</option></select></div>
+          <button class="btn btn-ghost btn-sm" id="btn_filtrar_gastos">Aplicar</button>
+        </div>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Cuenta</th><th class="num">Monto</th><th></th></tr></thead>
+          <tbody id="tabla_gastos"></tbody>
+          <tfoot><tr><td colspan="4">TOTAL</td><td class="num" id="tot_gastos_tab">$0.00</td><td></td></tr></tfoot>
+        </table></div>
+        <div class="empty" id="gastos_empty" style="display:none;">No hay gastos con este filtro.</div>
+      </div>
+    </div>
+
+    <div id="tab-deudas" style="display:none;">
+      <div class="panel">
+        <h2>Registrar Deuda / Tarjeta de Crédito</h2>
+        <div class="grid cols3">
+          <div class="field"><label>Entidad</label><select id="d_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Banco del Austro</option><option>Otro</option></select></div>
+          <div class="field"><label>Tipo</label><select id="d_tipo"><option>Préstamo</option><option>Tarjeta de Crédito</option><option>Línea de Crédito</option><option>Otro</option></select></div>
+          <div class="field"><label>Descripción</label><input id="d_descripcion" placeholder="Ej. Préstamo equipo"></div>
+          <div class="field"><label>Monto Total ($)</label><input id="d_monto_total" type="number" step="0.01" placeholder="0.00"></div>
+          <div class="field"><label>N° Total de Cuotas</label><input id="d_cuotas_total" type="number" step="1" placeholder="Ej. 12"></div>
+          <div class="field"><label>Valor de la Cuota ($)</label><input id="d_valor_cuota" type="number" step="0.01" placeholder="0.00"></div>
+          <div class="field"><label>Cuotas ya Pagadas</label><input id="d_cuotas_pagadas" type="number" step="1" value="0"></div>
+          <div class="field"><label>Fecha de Inicio</label><input id="d_fecha_inicio" type="date"></div>
+        </div>
+        <div class="actions"><button class="btn btn-primary" id="btn_guardar_deuda">Guardar Deuda</button></div>
+      </div>
+      <div class="panel">
+        <h2>Deudas Activas</h2>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Entidad</th><th>Tipo</th><th>Descripción</th><th class="num">Cuotas</th><th class="num">Restantes</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="tabla_deudas"></tbody>
+          <tfoot><tr><td colspan="5">SALDO TOTAL EN DEUDAS</td><td class="num" id="tot_deuda">$0.00</td><td colspan="2"></td></tr></tfoot>
+        </table></div>
+        <div class="empty" id="deudas_empty" style="display:none;">No tienes deudas registradas.</div>
+      </div>
+    </div>
+
+    <div id="tab-capital" style="display:none;">
+      <div class="panel">
+        <h2>Registrar Aporte de Capital</h2>
+        <div class="grid cols3">
+          <div class="field"><label>Fecha</label><input id="c_fecha" type="date"></div>
+          <div class="field"><label>Monto ($)</label><input id="c_monto" type="number" step="0.01" placeholder="0.00"></div>
+          <div class="field"><label>Origen / Descripción</label><input id="c_descripcion" placeholder="Ej. Aporte inicial"></div>
+        </div>
+        <div class="actions"><button class="btn btn-primary" id="btn_guardar_capital">Guardar Aporte</button></div>
+      </div>
+      <div class="panel">
+        <h2>Historial de Aportes</h2>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Fecha</th><th>Origen / Descripción</th><th class="num">Monto</th><th></th></tr></thead>
+          <tbody id="tabla_capital"></tbody>
+          <tfoot><tr><td colspan="2">CAPITAL TOTAL</td><td class="num" id="tot_capital">$0.00</td><td></td></tr></tfoot>
+        </table></div>
+        <div class="empty" id="capital_empty" style="display:none;">Aún no hay aportes registrados.</div>
+      </div>
+    </div>
+
+    <div id="tab-reporte" style="display:none;">
+      <div class="panel">
+        <h2>Reporte Financiero</h2>
+        <div class="filters">
+          <div class="field"><label>Periodo</label><input type="month" id="rep_mes"></div>
+          <button class="btn btn-ghost btn-sm" id="btn_todo_periodo">Ver Todo</button>
+          <button class="btn btn-primary btn-sm" id="btn_generar_reporte">Generar</button>
+        </div>
+        <div class="report-box" id="reporte_box" style="display:none;"></div>
+        <div class="actions" id="reporte_actions" style="display:none;">
+          <button class="btn btn-ghost" id="btn_copiar_reporte">Copiar Reporte</button>
+          <button class="btn btn-ghost" id="btn_imprimir_reporte">Imprimir / Guardar PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let API_URL = localStorage.getItem('cepro_api_url') || '';
+let CAPITAL=[], INGRESOS=[], GASTOS=[], DEUDAS=[];
+
+function fmt(n){ return '$' + (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3200); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+document.getElementById('btn_config').addEventListener('click', ()=>{
+  const b = document.getElementById('setup_banner');
+  b.style.display = b.style.display==='none' ? 'block' : 'none';
+  document.getElementById('api_url_input').value = API_URL;
+});
+document.getElementById('btn_guardar_config').addEventListener('click', async ()=>{
+  const val = document.getElementById('api_url_input').value.trim();
+  if(!val.startsWith('https://script.google.com/')){ showToast('Esa URL no parece de Apps Script.'); return; }
+  API_URL = val;
+  localStorage.setItem('cepro_api_url', API_URL);
+  showToast('Conectando...');
+  await initApp();
+});
+
+async function apiGet(sheet){
+  const res = await fetch(`${API_URL}?sheet=${sheet}`);
+  const json = await res.json();
+  if(json.error) throw new Error(json.error);
+  return json;
+}
+async function apiPost(sheet, action, extra){
+  const res = await fetch(API_URL, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({sheet, action, ...extra})
+  });
+  const json = await res.json();
+  if(json.error) throw new Error(json.error);
+  return json;
+}
+
+function normBool(v){ return v===true || v==='TRUE' || v==='true' || v===1 || v==='1'; }
+function normNum(v){ return Number(v)||0; }
+
+async function loadAll(){
+  const [ing, gas, deu, cap] = await Promise.all([
+    apiGet('Ventas'), apiGet('Gastos'), apiGet('Deudas'), apiGet('Capital')
+  ]);
+  INGRESOS = ing.map(i=>({...i, monto:normNum(i.monto), confirmado:normBool(i.confirmado)}));
+  GASTOS = gas.map(g=>({...g, monto:normNum(g.monto)}));
+  DEUDAS = deu.map(d=>({...d, montoTotal:normNum(d.montoTotal), cuotasTotal:normNum(d.cuotasTotal), valorCuota:normNum(d.valorCuota), cuotasPagadas:normNum(d.cuotasPagadas)}));
+  CAPITAL = cap.map(c=>({...c, monto:normNum(c.monto)}));
+  renderAll();
+}
+
+async function initApp(){
+  if(!API_URL){
+    document.getElementById('setup_banner').style.display='block';
+    document.getElementById('app_content').style.display='none';
+    return;
+  }
+  try{
+    await loadAll();
+    document.getElementById('setup_banner').style.display='none';
+    document.getElementById('app_content').style.display='block';
+  }catch(e){
+    showToast('No se pudo conectar: ' + e.message);
+    document.getElementById('setup_banner').style.display='block';
+  }
+}
+
+function renderAll(){
+  renderTicker(); renderRanking(); renderMeses(); renderPendientes();
+  renderTablaIngresos(); renderTablaGastos(); renderTablaDeudas(); renderTablaCapital();
+}
+
+function renderTicker(){
+  const now = new Date();
+  const totalCapital = CAPITAL.reduce((s,c)=>s+c.monto,0);
+  const totalIngresos = INGRESOS.reduce((s,i)=>s+i.monto,0);
+  const totalGastos = GASTOS.reduce((s,g)=>s+g.monto,0);
+  const saldo = totalCapital + totalIngresos - totalGastos;
+  const totalDeuda = DEUDAS.reduce((s,d)=>s+deudaSaldoPendiente(d),0);
+  const ingresosMes = INGRESOS.filter(i=>{const d=new Date(i.fecha);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).reduce((s,i)=>s+i.monto,0);
+  const gastosMes = GASTOS.filter(g=>{const d=new Date(g.fecha);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).reduce((s,g)=>s+g.monto,0);
+  const utilidadMes = ingresosMes - gastosMes;
+  const pendientes = INGRESOS.filter(i=>!i.confirmado);
+  const pendienteMonto = pendientes.reduce((s,i)=>s+i.monto,0);
+  document.getElementById('ticker').innerHTML = `
+    <div class="tick"><div class="n">${fmt(saldo)}</div><div class="l">Saldo Operativo</div></div>
+    <div class="tick"><div class="n">${fmt(ingresosMes)}</div><div class="l">Ventas Este Mes</div></div>
+    <div class="tick"><div class="n">${fmt(gastosMes)}</div><div class="l">Gastos Este Mes</div></div>
+    <div class="tick"><div class="n ${utilidadMes<0?'neg':''}">${fmt(utilidadMes)}</div><div class="l">Utilidad Este Mes</div></div>
+    <div class="tick"><div class="n ${totalDeuda>0?'neg':''}">${fmt(totalDeuda)}</div><div class="l">Deuda Pendiente</div></div>
+    <div class="tick"><div class="n ${pendientes.length?'warn':''}">${pendientes.length}</div><div class="l">Por Confirmar (${fmt(pendienteMonto)})</div></div>`;
+}
+
+function renderRanking(){
+  const map = {};
+  INGRESOS.forEach(i=>{ const key=i.curso||'(Sin curso)'; if(!map[key])map[key]={monto:0,count:0}; map[key].monto+=i.monto; map[key].count+=1; });
+  const arr = Object.entries(map).map(([curso,v])=>({curso,...v})).sort((a,b)=>b.monto-a.monto);
+  const box=document.getElementById('ranking_cursos'), empty=document.getElementById('ranking_empty');
+  if(arr.length===0){ box.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  const max = arr[0].monto||1;
+  box.innerHTML = arr.map(r=>`<div class="bar-row"><div class="bar-label">${r.curso}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(6,(r.monto/max*100))}%"><span>${fmt(r.monto)}</span></div></div><div class="bar-count">${r.count} venta${r.count!==1?'s':''}</div></div>`).join('');
+}
+
+function renderMeses(){
+  const now=new Date(); const rows=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(), now.getMonth()-i, 1); const y=d.getFullYear(), m=d.getMonth();
+    const ing = INGRESOS.filter(x=>{const dd=new Date(x.fecha);return dd.getMonth()===m&&dd.getFullYear()===y;}).reduce((s,x)=>s+x.monto,0);
+    const gas = GASTOS.filter(x=>{const dd=new Date(x.fecha);return dd.getMonth()===m&&dd.getFullYear()===y;}).reduce((s,x)=>s+x.monto,0);
+    rows.push({label:d.toLocaleDateString('es-EC',{month:'long',year:'numeric'}), ing, gas, util:ing-gas});
+  }
+  document.getElementById('tabla_meses').innerHTML = rows.map(r=>`<tr><td style="text-transform:capitalize;">${r.label}</td><td class="num">${fmt(r.ing)}</td><td class="num">${fmt(r.gas)}</td><td class="num" style="color:${r.util<0?'var(--danger)':'var(--accent)'}">${fmt(r.util)}</td></tr>`).join('');
+}
+
+function renderPendientes(){
+  const pend = INGRESOS.filter(i=>!i.confirmado).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+  const body=document.getElementById('tabla_pendientes'), empty=document.getElementById('pendientes_empty');
+  if(pend.length===0){ body.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  body.innerHTML = pend.map(p=>`<tr><td>${p.fecha}</td><td>${p.concepto}</td><td>${p.curso}</td><td>${p.banco}</td><td class="num">${fmt(p.monto)}</td><td><button class="btn btn-ghost btn-sm" onclick="confirmarIngreso('${p.id}')">Confirmar</button></td></tr>`).join('');
+}
+
+window.confirmarIngreso = async function(id){
+  await apiPost('Ventas','update',{id, data:{confirmado:true}});
+  showToast('Venta confirmada.');
+  await loadAll();
+};
+
+document.getElementById('btn_guardar_ingreso').addEventListener('click', async ()=>{
+  const fecha=document.getElementById('i_fecha').value||new Date().toISOString().slice(0,10);
+  const tipo=document.getElementById('i_tipo').value;
+  const curso=document.getElementById('i_curso').value.trim();
+  const concepto=document.getElementById('i_concepto').value.trim();
+  const asesor=document.getElementById('i_asesor').value;
+  const banco=document.getElementById('i_banco').value;
+  const monto=Number(document.getElementById('i_monto').value)||0;
+  const confirmado=document.getElementById('i_confirmado').value==='si';
+  if(!curso){ showToast('Falta el curso.'); return; }
+  if(monto<=0){ showToast('El monto debe ser mayor a 0.'); return; }
+  try{
+    await apiPost('Ventas','add',{data:{id:uid(), fecha, tipo, curso, concepto, asesor, banco, monto, confirmado}});
+    document.getElementById('i_curso').value=''; document.getElementById('i_concepto').value=''; document.getElementById('i_monto').value='';
+    showToast('Venta guardada.');
+    await loadAll();
+  }catch(e){ showToast('Error al guardar: '+e.message); }
+});
+
+function renderTablaIngresos(){
+  const mes=document.getElementById('filt_i_mes').value, estado=document.getElementById('filt_i_estado').value;
+  let rows=INGRESOS.slice();
+  if(mes) rows=rows.filter(i=>i.fecha && i.fecha.slice(0,7)===mes);
+  if(estado==='no') rows=rows.filter(i=>!i.confirmado);
+  if(estado==='si') rows=rows.filter(i=>i.confirmado);
+  const body=document.getElementById('tabla_ingresos'), empty=document.getElementById('ingresos_empty');
+  if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; }
+  else{
+    empty.style.display='none';
+    body.innerHTML = rows.map(i=>`<tr><td>${i.fecha}</td><td>${i.tipo}</td><td>${i.curso}</td><td>${i.asesor}</td><td>${i.banco}</td><td class="num">${fmt(i.monto)}</td><td>${i.confirmado?'<span class="pill ok">Confirmado</span>':'<button class="btn btn-ghost btn-sm" onclick="confirmarIngreso(\''+i.id+'\')">Marcar</button>'}</td><td><button class="btn btn-ghost btn-sm" onclick="eliminarIngreso('${i.id}')">Eliminar</button></td></tr>`).join('');
+  }
+  document.getElementById('tot_ingresos').textContent = fmt(rows.reduce((s,i)=>s+i.monto,0));
+}
+window.eliminarIngreso = async function(id){
+  if(!confirm('¿Eliminar esta venta?')) return;
+  await apiPost('Ventas','delete',{id});
+  showToast('Venta eliminada.');
+  await loadAll();
+};
+document.getElementById('btn_filtrar_ingresos').addEventListener('click', renderTablaIngresos);
+
+document.getElementById('btn_guardar_gasto').addEventListener('click', async ()=>{
+  const fecha=document.getElementById('g_fecha').value||new Date().toISOString().slice(0,10);
+  const categoria=document.getElementById('g_categoria').value;
+  const banco=document.getElementById('g_banco').value;
+  const descripcion=document.getElementById('g_descripcion').value.trim();
+  const monto=Number(document.getElementById('g_monto').value)||0;
+  if(monto<=0){ showToast('El monto debe ser mayor a 0.'); return; }
+  try{
+    await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, descripcion, monto}});
+    document.getElementById('g_descripcion').value=''; document.getElementById('g_monto').value='';
+    showToast('Gasto guardado.');
+    await loadAll();
+  }catch(e){ showToast('Error al guardar: '+e.message); }
+});
+
+function renderTablaGastos(){
+  const mes=document.getElementById('filt_g_mes').value, cat=document.getElementById('filt_g_categoria').value;
+  let rows=GASTOS.slice();
+  if(mes) rows=rows.filter(g=>g.fecha && g.fecha.slice(0,7)===mes);
+  if(cat) rows=rows.filter(g=>g.categoria===cat);
+  const body=document.getElementById('tabla_gastos'), empty=document.getElementById('gastos_empty');
+  if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; }
+  else{
+    empty.style.display='none';
+    body.innerHTML = rows.map(g=>`<tr><td>${g.fecha}</td><td>${g.categoria}</td><td>${g.descripcion}</td><td>${g.banco}</td><td class="num">${fmt(g.monto)}</td><td><button class="btn btn-ghost btn-sm" onclick="eliminarGasto('${g.id}')">Eliminar</button></td></tr>`).join('');
+  }
+  document.getElementById('tot_gastos_tab').textContent = fmt(rows.reduce((s,g)=>s+g.monto,0));
+}
+window.eliminarGasto = async function(id){
+  if(!confirm('¿Eliminar este gasto?')) return;
+  await apiPost('Gastos','delete',{id});
+  showToast('Gasto eliminado.');
+  await loadAll();
+};
+document.getElementById('btn_filtrar_gastos').addEventListener('click', renderTablaGastos);
+
+function deudaCuotasRestantes(d){ return Math.max(0,(d.cuotasTotal||0)-(d.cuotasPagadas||0)); }
+function deudaSaldoPendiente(d){ return deudaCuotasRestantes(d)*(d.valorCuota||0); }
+
+document.getElementById('btn_guardar_deuda').addEventListener('click', async ()=>{
+  const banco=document.getElementById('d_banco').value;
+  const tipo=document.getElementById('d_tipo').value;
+  const descripcion=document.getElementById('d_descripcion').value.trim();
+  const montoTotal=Number(document.getElementById('d_monto_total').value)||0;
+  const cuotasTotal=Number(document.getElementById('d_cuotas_total').value)||0;
+  const valorCuota=Number(document.getElementById('d_valor_cuota').value)||0;
+  const cuotasPagadas=Number(document.getElementById('d_cuotas_pagadas').value)||0;
+  const fechaInicio=document.getElementById('d_fecha_inicio').value||new Date().toISOString().slice(0,10);
+  if(cuotasTotal<=0||valorCuota<=0){ showToast('Completa cuotas totales y valor de cuota.'); return; }
+  try{
+    await apiPost('Deudas','add',{data:{id:uid(), banco, tipo, descripcion, montoTotal, cuotasTotal, valorCuota, cuotasPagadas, fechaInicio}});
+    document.getElementById('d_descripcion').value=''; document.getElementById('d_monto_total').value=''; document.getElementById('d_cuotas_total').value=''; document.getElementById('d_valor_cuota').value=''; document.getElementById('d_cuotas_pagadas').value='0';
+    showToast('Deuda guardada.');
+    await loadAll();
+  }catch(e){ showToast('Error al guardar: '+e.message); }
+});
+
+function renderTablaDeudas(){
+  const body=document.getElementById('tabla_deudas'), empty=document.getElementById('deudas_empty');
+  if(DEUDAS.length===0){ body.innerHTML=''; empty.style.display='block'; document.getElementById('tot_deuda').textContent=fmt(0); return; }
+  empty.style.display='none';
+  body.innerHTML = DEUDAS.map(d=>{
+    const restantes=deudaCuotasRestantes(d), saldo=deudaSaldoPendiente(d);
+    const estado = restantes<=0 ? '<span class="pill ok">Pagada</span>' : '<span class="pill debt">Activa</span>';
+    return `<tr><td>${d.banco}</td><td>${d.tipo}</td><td>${d.descripcion}</td><td class="num">${d.cuotasPagadas}/${d.cuotasTotal}</td><td class="num">${restantes}</td><td class="num">${fmt(saldo)}</td><td>${estado}</td><td>${restantes>0?'<button class="btn btn-ghost btn-sm" onclick="pagarCuota(\''+d.id+'\')">+1 Cuota</button>':''} <button class="btn btn-ghost btn-sm" onclick="eliminarDeuda('${d.id}')">Eliminar</button></td></tr>`;
+  }).join('');
+  document.getElementById('tot_deuda').textContent = fmt(DEUDAS.reduce((s,d)=>s+deudaSaldoPendiente(d),0));
+}
+window.pagarCuota = async function(id){
+  const d = DEUDAS.find(x=>x.id===id);
+  if(d && d.cuotasPagadas < d.cuotasTotal){
+    await apiPost('Deudas','update',{id, data:{cuotasPagadas: d.cuotasPagadas+1}});
+    showToast('Cuota registrada.');
+    await loadAll();
+  }
+};
+window.eliminarDeuda = async function(id){
+  if(!confirm('¿Eliminar esta deuda?')) return;
+  await apiPost('Deudas','delete',{id});
+  showToast('Deuda eliminada.');
+  await loadAll();
+};
+
+document.getElementById('btn_guardar_capital').addEventListener('click', async ()=>{
+  const fecha=document.getElementById('c_fecha').value||new Date().toISOString().slice(0,10);
+  const monto=Number(document.getElementById('c_monto').value)||0;
+  const descripcion=document.getElementById('c_descripcion').value.trim();
+  if(monto<=0){ showToast('El monto debe ser mayor a 0.'); return; }
+  try{
+    await apiPost('Capital','add',{data:{id:uid(), fecha, monto, descripcion}});
+    document.getElementById('c_monto').value=''; document.getElementById('c_descripcion').value='';
+    showToast('Aporte guardado.');
+    await loadAll();
+  }catch(e){ showToast('Error al guardar: '+e.message); }
+});
+
+function renderTablaCapital(){
+  const body=document.getElementById('tabla_capital'), empty=document.getElementById('capital_empty');
+  if(CAPITAL.length===0){ body.innerHTML=''; empty.style.display='block'; }
+  else{
+    empty.style.display='none';
+    body.innerHTML = CAPITAL.map(c=>`<tr><td>${c.fecha}</td><td>${c.descripcion}</td><td class="num">${fmt(c.monto)}</td><td><button class="btn btn-ghost btn-sm" onclick="eliminarCapital('${c.id}')">Eliminar</button></td></tr>`).join('');
+  }
+  document.getElementById('tot_capital').textContent = fmt(CAPITAL.reduce((s,c)=>s+c.monto,0));
+}
+window.eliminarCapital = async function(id){
+  if(!confirm('¿Eliminar este aporte?')) return;
+  await apiPost('Capital','delete',{id});
+  showToast('Aporte eliminado.');
+  await loadAll();
+};
+
+document.getElementById('btn_todo_periodo').addEventListener('click', ()=>{ document.getElementById('rep_mes').value=''; generarReporte(); });
+document.getElementById('btn_generar_reporte').addEventListener('click', generarReporte);
+
+function generarReporte(){
+  const mes=document.getElementById('rep_mes').value;
+  const filtroLabel = mes ? new Date(mes+'-01').toLocaleDateString('es-EC',{month:'long',year:'numeric'}) : 'Histórico completo';
+  const ing = mes ? INGRESOS.filter(i=>i.fecha && i.fecha.slice(0,7)===mes) : INGRESOS.slice();
+  const gas = mes ? GASTOS.filter(g=>g.fecha && g.fecha.slice(0,7)===mes) : GASTOS.slice();
+  const totalVentas=ing.reduce((s,i)=>s+i.monto,0), totalGastosOp=gas.reduce((s,g)=>s+g.monto,0);
+  const utilidadNeta = totalVentas-totalGastosOp;
+  const porConcepto={}; ing.forEach(i=>{ porConcepto[i.tipo]=(porConcepto[i.tipo]||0)+i.monto; });
+  const porCategoriaGasto={}; gas.forEach(g=>{ porCategoriaGasto[g.categoria]=(porCategoriaGasto[g.categoria]||0)+g.monto; });
+  const cursosMap={}; ing.forEach(i=>{ const k=i.curso||'(Sin curso)'; cursosMap[k]=(cursosMap[k]||0)+i.monto; });
+  const topCursos=Object.entries(cursosMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const totalCapital=CAPITAL.reduce((s,c)=>s+c.monto,0);
+  const totalDeuda=DEUDAS.reduce((s,d)=>s+deudaSaldoPendiente(d),0);
+  const pendientesConfirmar=ing.filter(i=>!i.confirmado).length;
+  let txt = `REPORTE FINANCIERO — CEPROCENTER
+Periodo: ${filtroLabel}
+Generado: ${new Date().toLocaleDateString('es-EC')}
+
+RESUMEN EJECUTIVO
+Ventas totales: ${fmt(totalVentas)}
+Gastos totales: ${fmt(totalGastosOp)}
+Utilidad neta del periodo: ${fmt(utilidadNeta)}
+
+Capital total aportado: ${fmt(totalCapital)}
+Deuda pendiente: ${fmt(totalDeuda)}
+Ventas sin confirmar en banco: ${pendientesConfirmar}
+
+VENTAS POR CONCEPTO
+${Object.entries(porConcepto).map(([k,v])=>`  ${k}: ${fmt(v)}`).join('\n')||'  Sin datos'}
+
+TOP 5 CURSOS
+${topCursos.map(([k,v],idx)=>`  ${idx+1}. ${k}: ${fmt(v)}`).join('\n')||'  Sin datos'}
+
+GASTOS POR CATEGORÍA
+${Object.entries(porCategoriaGasto).map(([k,v])=>`  ${k}: ${fmt(v)}`).join('\n')||'  Sin datos'}
+
+DEUDAS ACTIVAS
+${DEUDAS.filter(d=>deudaCuotasRestantes(d)>0).map(d=>`  ${d.banco} — ${d.descripcion}: ${d.cuotasPagadas}/${d.cuotasTotal} cuotas, restante ${fmt(deudaSaldoPendiente(d))}`).join('\n')||'  Sin deudas activas'}`;
+  const box=document.getElementById('reporte_box');
+  box.textContent=txt; box.style.display='block';
+  document.getElementById('reporte_actions').style.display='flex';
+}
+document.getElementById('btn_copiar_reporte').addEventListener('click', async ()=>{
+  try{ await navigator.clipboard.writeText(document.getElementById('reporte_box').textContent); showToast('Reporte copiado.'); }
+  catch(e){ showToast('No se pudo copiar.'); }
+});
+document.getElementById('btn_imprimir_reporte').addEventListener('click', ()=>window.print());
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    ['resumen','ingresos','gastos','deudas','capital','reporte'].forEach(t=>{
+      document.getElementById('tab-'+t).style.display = (t===tab.dataset.tab) ? 'block' : 'none';
+    });
+  });
+});
+
+['i_fecha','g_fecha','c_fecha','d_fecha_inicio'].forEach(id=>document.getElementById(id).valueAsDate = new Date());
+initApp();
+</script>
+</body>
+</html>
