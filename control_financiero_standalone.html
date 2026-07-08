@@ -54,6 +54,11 @@
   tr:hover td{background:var(--panel-2);}
   .num{text-align:right;font-variant-numeric:tabular-nums;}
   .table-scroll{overflow-x:auto;}
+  .sticky-col{position:sticky;background:var(--panel);z-index:2;}
+  .sticky-1{left:0;}
+  .sticky-2{left:100px;}
+  .sticky-3{left:280px;box-shadow:2px 0 4px rgba(0,0,0,0.06);}
+  thead .sticky-col{z-index:3;background:var(--panel-2);}
   tfoot td{border-top:1px solid var(--accent);border-bottom:none;font-weight:700;color:var(--accent);}
   .filters{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;}
   .filters .field{min-width:150px;}
@@ -142,6 +147,13 @@
           <div class="field"><label>Estudiante / Detalle</label><input id="i_concepto" placeholder="Nombre o detalle"></div>
           <div class="field"><label>Vendido por</label><select id="i_asesor"><option>Jose</option><option>Sara</option><option>Directo</option></select></div>
           <div class="field"><label>Cuenta Bancaria</label><select id="i_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Otro</option></select></div>
+          <div class="field"><label>Método de Pago</label>
+            <select id="i_metodo_pago">
+              <option>Transferencia Bancaria</option><option>Depósito</option><option>Efectivo</option>
+              <option>PayPal</option><option>Zelle</option><option>Binance</option><option>Pago Móvil</option>
+              <option>Western Union/Zoom</option><option>Tarjeta de Crédito</option><option>Otro</option>
+            </select>
+          </div>
           <div class="field"><label>Monto Vendido ($)</label><input id="i_monto" type="number" step="0.01" placeholder="0.00"></div>
           <div class="field"><label>Estado</label><select id="i_confirmado"><option value="no">Pendiente</option><option value="si">Confirmado</option></select></div>
           <div class="field" style="display:flex;align-items:flex-end;">
@@ -158,12 +170,19 @@
         <div class="filters">
           <div class="field"><label>Mes</label><input type="month" id="filt_i_mes"></div>
           <div class="field"><label>Estado</label><select id="filt_i_estado"><option value="">Todos</option><option value="no">Pendientes</option><option value="si">Confirmados</option></select></div>
+          <div class="field"><label>Método de Pago</label><select id="filt_i_metodo"><option value="">Todos</option></select></div>
+          <div class="field"><label>Cuenta Bancaria</label><select id="filt_i_banco"><option value="">Todas</option></select></div>
           <button class="btn btn-ghost btn-sm" id="btn_filtrar_ingresos">Aplicar</button>
         </div>
         <div class="table-scroll"><table>
-          <thead><tr><th>Fecha</th><th>Concepto</th><th>Curso</th><th>Vendido por</th><th>Cuenta</th><th class="num">Monto</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr>
+            <th class="sticky-col sticky-1">Fecha</th>
+            <th class="sticky-col sticky-2">Estudiante</th>
+            <th class="sticky-col sticky-3">Estado</th>
+            <th>Módulo</th><th>Curso</th><th>Vendido por</th><th>Método</th><th>Cuenta</th><th class="num">Monto</th><th></th>
+          </tr></thead>
           <tbody id="tabla_ingresos"></tbody>
-          <tfoot><tr><td colspan="5">TOTAL</td><td class="num" id="tot_ingresos">$0.00</td><td colspan="2"></td></tr></tfoot>
+          <tfoot><tr><td colspan="8">TOTAL</td><td class="num" id="tot_ingresos">$0.00</td><td></td></tr></tfoot>
         </table></div>
         <div class="empty" id="ingresos_empty" style="display:none;">No hay ventas con este filtro.</div>
       </div>
@@ -405,30 +424,67 @@ document.getElementById('btn_guardar_ingreso').addEventListener('click', async (
   const concepto=document.getElementById('i_concepto').value.trim();
   const asesor=document.getElementById('i_asesor').value;
   const banco=document.getElementById('i_banco').value;
+  const metodoPago=document.getElementById('i_metodo_pago').value;
   const monto=Number(document.getElementById('i_monto').value)||0;
   const confirmado=document.getElementById('i_confirmado').value==='si';
   const esHistorica=document.getElementById('i_historica').checked;
   if(!curso){ showToast('Falta el curso.'); return; }
   if(monto<=0){ showToast('El monto debe ser mayor a 0.'); return; }
   try{
-    await apiPost('Ventas','add',{data:{id:uid(), fecha, tipo, curso, concepto, asesor, banco, monto, confirmado, esHistorica}});
+    await apiPost('Ventas','add',{data:{id:uid(), fecha, tipo, curso, concepto, asesor, banco, metodoPago, monto, confirmado, esHistorica}});
     document.getElementById('i_curso').value=''; document.getElementById('i_concepto').value=''; document.getElementById('i_monto').value=''; document.getElementById('i_historica').checked=false;
     showToast('Venta guardada.');
     await loadAll();
   }catch(e){ showToast('Error al guardar: '+e.message); }
 });
 
+function fechaCorta(fechaStr){
+  if(!fechaStr) return '—';
+  const d = new Date(fechaStr + (fechaStr.length<=10 ? 'T00:00:00' : ''));
+  if(isNaN(d.getTime())) return fechaStr;
+  return d.toLocaleDateString('es-EC', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+
+function acortarModulo(texto){
+  if(!texto) return '';
+  const match = texto.match(/m[oó]dulo\s*(\d+)/i) || texto.match(/(\d+)/);
+  if(match) return 'Módulo ' + match[1];
+  return texto.length > 15 ? texto.slice(0,15).trim() + '…' : texto;
+}
+
 function renderTablaIngresos(){
   const mes=document.getElementById('filt_i_mes').value, estado=document.getElementById('filt_i_estado').value;
+  const metodo=document.getElementById('filt_i_metodo').value, bancoF=document.getElementById('filt_i_banco').value;
+
+  const metodosDisponibles = [...new Set(INGRESOS.map(i=>i.metodoPago).filter(Boolean))].sort();
+  const bancosDisponibles = [...new Set(INGRESOS.map(i=>i.banco).filter(Boolean))].sort();
+  const selMetodo = document.getElementById('filt_i_metodo'), selBanco = document.getElementById('filt_i_banco');
+  if(selMetodo.dataset.poblado!=='si'){
+    selMetodo.innerHTML = '<option value="">Todos</option>' + metodosDisponibles.map(m=>`<option>${m}</option>`).join('');
+    selBanco.innerHTML = '<option value="">Todas</option>' + bancosDisponibles.map(b=>`<option>${b}</option>`).join('');
+    selMetodo.dataset.poblado='si'; selBanco.dataset.poblado='si';
+  }
+
   let rows=INGRESOS.slice();
   if(mes) rows=rows.filter(i=>i.fecha && i.fecha.slice(0,7)===mes);
   if(estado==='no') rows=rows.filter(i=>!i.confirmado);
   if(estado==='si') rows=rows.filter(i=>i.confirmado);
+  if(metodo) rows=rows.filter(i=>i.metodoPago===metodo);
+  if(bancoF) rows=rows.filter(i=>i.banco===bancoF);
+
   const body=document.getElementById('tabla_ingresos'), empty=document.getElementById('ingresos_empty');
   if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; }
   else{
     empty.style.display='none';
-    body.innerHTML = rows.map(i=>`<tr${i.esHistorica?' style="opacity:0.6;"':''}><td>${i.fecha}</td><td>${i.tipo}${i.esHistorica?' <span class="pill na">Histórica</span>':''}</td><td>${i.curso}</td><td>${i.asesor}</td><td>${i.banco}</td><td class="num">${fmt(i.monto)}</td><td>${i.confirmado?'<span class="pill ok">Confirmado</span>':'<button class="btn btn-ghost btn-sm" onclick="confirmarIngreso(\''+i.id+'\')">Marcar</button>'}</td><td><button class="btn btn-ghost btn-sm" onclick="eliminarIngreso('${i.id}')">Eliminar</button></td></tr>`).join('');
+    body.innerHTML = rows.map(i=>`<tr${i.esHistorica?' style="opacity:0.6;"':''}>
+      <td class="sticky-col sticky-1">${fechaCorta(i.fecha)}</td>
+      <td class="sticky-col sticky-2">${i.concepto}</td>
+      <td class="sticky-col sticky-3">${i.confirmado?'<span class="pill ok">Confirmado</span>':'<button class="btn btn-ghost btn-sm" onclick="confirmarIngreso(\''+i.id+'\')">Marcar</button>'}</td>
+      <td title="${(i.tipo||'').replace(/"/g,'&quot;')}">${acortarModulo(i.tipo)}${i.esHistorica?' <span class="pill na">Histórica</span>':''}</td>
+      <td>${i.curso}</td><td>${i.asesor}</td><td>${i.metodoPago||'—'}</td><td>${i.banco}</td>
+      <td class="num">${fmt(i.monto)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="eliminarIngreso('${i.id}')">Eliminar</button></td>
+    </tr>`).join('');
   }
   document.getElementById('tot_ingresos').textContent = fmt(rows.reduce((s,i)=>s+i.monto,0));
 }
