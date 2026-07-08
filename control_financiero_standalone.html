@@ -196,7 +196,7 @@
         <div class="grid cols3">
           <div class="field"><label>Fecha</label><input id="g_fecha" type="date"></div>
           <div class="field"><label>Categoría</label><select id="g_categoria">
-            <option>Sueldos</option><option>Diseñador</option><option>Comisiones</option><option>Arriendo</option><option>Publicidad</option><option>Contador</option><option>Softwares varios</option><option>Pago a Tutores</option><option>Gasto de Curso</option><option>Otros</option>
+            <option>Sueldos</option><option>Diseñador</option><option>Comisiones</option><option>Arriendo</option><option>Publicidad</option><option>Contador</option><option>Softwares varios</option><option>Pago a Tutores</option><option>Gasto de Curso</option><option>Pago de Deuda</option><option>Otros</option>
           </select></div>
           <div class="field"><label>Cuenta Bancaria</label><select id="g_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Otro</option></select></div>
           <div class="field"><label>Descripción</label><input id="g_descripcion" placeholder="Detalle del gasto"></div>
@@ -208,7 +208,7 @@
         <h2>Historial de Gastos</h2>
         <div class="filters">
           <div class="field"><label>Mes</label><input type="month" id="filt_g_mes"></div>
-          <div class="field"><label>Categoría</label><select id="filt_g_categoria"><option value="">Todas</option><option>Sueldos</option><option>Diseñador</option><option>Comisiones</option><option>Arriendo</option><option>Publicidad</option><option>Contador</option><option>Softwares varios</option><option>Pago a Tutores</option><option>Gasto de Curso</option><option>Otros</option></select></div>
+          <div class="field"><label>Categoría</label><select id="filt_g_categoria"><option value="">Todas</option><option>Sueldos</option><option>Diseñador</option><option>Comisiones</option><option>Arriendo</option><option>Publicidad</option><option>Contador</option><option>Softwares varios</option><option>Pago a Tutores</option><option>Gasto de Curso</option><option>Pago de Deuda</option><option>Otros</option></select></div>
           <button class="btn btn-ghost btn-sm" id="btn_filtrar_gastos">Aplicar</button>
         </div>
         <div class="table-scroll"><table>
@@ -238,9 +238,9 @@
       <div class="panel">
         <h2>Deudas Activas</h2>
         <div class="table-scroll"><table>
-          <thead><tr><th>Entidad</th><th>Tipo</th><th>Descripción</th><th class="num">Cuotas</th><th class="num">Restantes</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Entidad</th><th>Tipo</th><th>Descripción</th><th class="num">Valor Cuota</th><th class="num">Cuotas</th><th class="num">Restantes</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead>
           <tbody id="tabla_deudas"></tbody>
-          <tfoot><tr><td colspan="5">SALDO TOTAL EN DEUDAS</td><td class="num" id="tot_deuda">$0.00</td><td colspan="2"></td></tr></tfoot>
+          <tfoot><tr><td colspan="6">SALDO TOTAL EN DEUDAS</td><td class="num" id="tot_deuda">$0.00</td><td colspan="2"></td></tr></tfoot>
         </table></div>
         <div class="empty" id="deudas_empty" style="display:none;">No tienes deudas registradas.</div>
       </div>
@@ -587,16 +587,23 @@ function renderTablaDeudas(){
   body.innerHTML = DEUDAS.map(d=>{
     const restantes=deudaCuotasRestantes(d), saldo=deudaSaldoPendiente(d);
     const estado = restantes<=0 ? '<span class="pill ok">Pagada</span>' : '<span class="pill debt">Activa</span>';
-    return `<tr><td>${d.banco}</td><td>${d.tipo}</td><td>${d.descripcion}</td><td class="num">${d.cuotasPagadas}/${d.cuotasTotal}</td><td class="num">${restantes}</td><td class="num">${fmt(saldo)}</td><td>${estado}</td><td>${restantes>0?'<button class="btn btn-ghost btn-sm" onclick="pagarCuota(\''+d.id+'\')">+1 Cuota</button>':''} <button class="btn btn-ghost btn-sm" onclick="eliminarDeuda('${d.id}')">Eliminar</button></td></tr>`;
+    return `<tr><td>${d.banco}</td><td>${d.tipo}</td><td>${d.descripcion}</td><td class="num">${fmt(d.valorCuota)}</td><td class="num">${d.cuotasPagadas}/${d.cuotasTotal}</td><td class="num">${restantes}</td><td class="num">${fmt(saldo)}</td><td>${estado}</td><td>${restantes>0?'<button class="btn btn-ghost btn-sm" onclick="pagarCuota(\''+d.id+'\')">+1 Cuota</button>':''} <button class="btn btn-ghost btn-sm" onclick="eliminarDeuda('${d.id}')">Eliminar</button></td></tr>`;
   }).join('');
   document.getElementById('tot_deuda').textContent = fmt(DEUDAS.reduce((s,d)=>s+deudaSaldoPendiente(d),0));
 }
 window.pagarCuota = async function(id){
   const d = DEUDAS.find(x=>x.id===id);
   if(d && d.cuotasPagadas < d.cuotasTotal){
-    await apiPost('Deudas','update',{id, data:{cuotasPagadas: d.cuotasPagadas+1}});
-    showToast('Cuota registrada.');
-    await loadAll();
+    try{
+      await apiPost('Deudas','update',{id, data:{cuotasPagadas: d.cuotasPagadas+1}});
+      await apiPost('Gastos','add',{data:{
+        id:uid(), fecha:new Date().toISOString().slice(0,10), categoria:'Pago de Deuda',
+        banco:d.banco, descripcion:`Cuota ${d.cuotasPagadas+1}/${d.cuotasTotal} — ${d.descripcion}`,
+        monto:d.valorCuota
+      }});
+      showToast('Cuota registrada y descontada del saldo como gasto.');
+      await loadAll();
+    }catch(e){ showToast('Error al registrar la cuota: '+e.message); }
   }
 };
 window.eliminarDeuda = async function(id){
