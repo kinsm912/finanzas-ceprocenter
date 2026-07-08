@@ -168,12 +168,14 @@
       <div class="panel">
         <h2>Historial de Ventas</h2>
         <div class="filters">
+          <div class="field"><label>Buscar Estudiante</label><input type="text" id="filt_i_estudiante" placeholder="Nombre..."></div>
           <div class="field"><label>Mes</label><input type="month" id="filt_i_mes"></div>
           <div class="field"><label>Estado</label><select id="filt_i_estado"><option value="">Todos</option><option value="no">Pendientes</option><option value="si">Confirmados</option></select></div>
           <div class="field"><label>Método de Pago</label><select id="filt_i_metodo"><option value="">Todos</option></select></div>
           <div class="field"><label>Cuenta Bancaria</label><select id="filt_i_banco"><option value="">Todas</option></select></div>
           <button class="btn btn-ghost btn-sm" id="btn_filtrar_ingresos">Aplicar</button>
         </div>
+        <div id="resumen_estudiante_filtrado" class="hint" style="margin-bottom:8px;"></div>
         <div class="table-scroll"><table>
           <thead><tr>
             <th class="sticky-col sticky-1">Fecha</th>
@@ -452,6 +454,10 @@ function acortarModulo(texto){
   return texto.length > 15 ? texto.slice(0,15).trim() + '…' : texto;
 }
 
+function normalizarBusqueda(t){
+  return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+
 function fechaValor(f){
   if(!f) return 0;
   const partes = String(f).slice(0,10).split('-');
@@ -462,6 +468,7 @@ function fechaValor(f){
 function renderTablaIngresos(){
   const mes=document.getElementById('filt_i_mes').value, estado=document.getElementById('filt_i_estado').value;
   const metodo=document.getElementById('filt_i_metodo').value, bancoF=document.getElementById('filt_i_banco').value;
+  const estudianteBuscado=normalizarBusqueda(document.getElementById('filt_i_estudiante').value.trim());
 
   const metodosDisponibles = [...new Set(INGRESOS.map(i=>i.metodoPago).filter(Boolean))].sort();
   const bancosDisponibles = [...new Set(INGRESOS.map(i=>i.banco).filter(Boolean))].sort();
@@ -478,7 +485,18 @@ function renderTablaIngresos(){
   if(estado==='si') rows=rows.filter(i=>i.confirmado);
   if(metodo) rows=rows.filter(i=>i.metodoPago===metodo);
   if(bancoF) rows=rows.filter(i=>i.banco===bancoF);
+  if(estudianteBuscado) rows=rows.filter(i=>normalizarBusqueda(i.concepto).includes(estudianteBuscado));
   rows.sort((a,b)=> fechaValor(b.fecha) - fechaValor(a.fecha));
+
+  const resumenBox = document.getElementById('resumen_estudiante_filtrado');
+  if(estudianteBuscado && rows.length>0){
+    const totalEst = rows.reduce((s,i)=>s+i.monto,0);
+    resumenBox.innerHTML = `<b>${rows.length}</b> pago(s) encontrado(s) — total <b>${fmt(totalEst)}</b>.`;
+  }else if(estudianteBuscado){
+    resumenBox.innerHTML = 'No se encontraron pagos con ese nombre.';
+  }else{
+    resumenBox.innerHTML = '';
+  }
 
   const body=document.getElementById('tabla_ingresos'), empty=document.getElementById('ingresos_empty');
   if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; }
@@ -503,6 +521,7 @@ window.eliminarIngreso = async function(id){
   await loadAll();
 };
 document.getElementById('btn_filtrar_ingresos').addEventListener('click', renderTablaIngresos);
+document.getElementById('filt_i_estudiante').addEventListener('input', renderTablaIngresos);
 
 document.getElementById('btn_guardar_gasto').addEventListener('click', async ()=>{
   const fecha=document.getElementById('g_fecha').value||new Date().toISOString().slice(0,10);
