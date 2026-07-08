@@ -471,6 +471,7 @@ function renderTablaIngresos(){
   if(estado==='si') rows=rows.filter(i=>i.confirmado);
   if(metodo) rows=rows.filter(i=>i.metodoPago===metodo);
   if(bancoF) rows=rows.filter(i=>i.banco===bancoF);
+  rows.sort((a,b)=> String(b.fecha||'').localeCompare(String(a.fecha||'')));
 
   const body=document.getElementById('tabla_ingresos'), empty=document.getElementById('ingresos_empty');
   if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; }
