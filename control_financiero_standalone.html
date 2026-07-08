@@ -452,6 +452,13 @@ function acortarModulo(texto){
   return texto.length > 15 ? texto.slice(0,15).trim() + '…' : texto;
 }
 
+function fechaValor(f){
+  if(!f) return 0;
+  const partes = String(f).slice(0,10).split('-');
+  if(partes.length!==3) return 0;
+  return Number(partes[0])*10000 + Number(partes[1])*100 + Number(partes[2]);
+}
+
 function renderTablaIngresos(){
   const mes=document.getElementById('filt_i_mes').value, estado=document.getElementById('filt_i_estado').value;
   const metodo=document.getElementById('filt_i_metodo').value, bancoF=document.getElementById('filt_i_banco').value;
@@ -471,7 +478,7 @@ function renderTablaIngresos(){
   if(estado==='si') rows=rows.filter(i=>i.confirmado);
   if(metodo) rows=rows.filter(i=>i.metodoPago===metodo);
   if(bancoF) rows=rows.filter(i=>i.banco===bancoF);
-  rows.sort((a,b)=> String(b.fecha||'').localeCompare(String(a.fecha||'')));
+  rows.sort((a,b)=> fechaValor(b.fecha) - fechaValor(a.fecha));
 
   const body=document.getElementById('tabla_ingresos'), empty=document.getElementById('ingresos_empty');
   if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; }
