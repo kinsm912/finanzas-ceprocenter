@@ -114,6 +114,15 @@
 
     <div id="tab-resumen">
       <div class="panel">
+        <h2>Saldos por Cuenta / Forma de Pago</h2>
+        <p class="hint">Ventas menos gastos de cada cuenta, contando solo movimientos desde el 1 de julio de 2026 (no incluye ventas históricas).</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Cuenta / Forma de Pago</th><th class="num">Ventas</th><th class="num">Gastos</th><th class="num">Saldo</th></tr></thead>
+          <tbody id="tabla_saldos_cuenta"></tbody>
+        </table></div>
+        <div class="empty" id="saldos_cuenta_empty" style="display:none;">Sin movimientos registrados desde el 1 de julio.</div>
+      </div>
+      <div class="panel">
         <h2>Curso Más Vendido</h2>
         <div id="ranking_cursos"></div>
         <div class="empty" id="ranking_empty" style="display:none;">Aún no hay ventas registradas.</div>
@@ -146,7 +155,7 @@
           <div class="field"><label>Curso / Programa</label><input id="i_curso" placeholder="Ej. Diplomado de TDAH"></div>
           <div class="field"><label>Estudiante / Detalle</label><input id="i_concepto" placeholder="Nombre o detalle"></div>
           <div class="field"><label>Vendido por</label><select id="i_asesor"><option>Jose</option><option>Sara</option><option>Directo</option></select></div>
-          <div class="field"><label>Cuenta Bancaria</label><select id="i_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Otro</option></select></div>
+          <div class="field"><label>Cuenta Bancaria</label><select id="i_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Zelle</option><option>PayPal</option><option>Pago Móvil</option><option>Otro</option></select></div>
           <div class="field"><label>Método de Pago</label>
             <select id="i_metodo_pago">
               <option>Transferencia Bancaria</option><option>Depósito</option><option>Efectivo</option>
@@ -198,7 +207,7 @@
           <div class="field"><label>Categoría</label><select id="g_categoria">
             <option>Sueldos</option><option>Diseñador</option><option>Comisiones</option><option>Arriendo</option><option>Publicidad</option><option>Contador</option><option>Softwares varios</option><option>Pago a Tutores</option><option>Gasto de Curso</option><option>Pago de Deuda</option><option>Otros</option>
           </select></div>
-          <div class="field"><label>Cuenta Bancaria</label><select id="g_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Otro</option></select></div>
+          <div class="field"><label>Cuenta Bancaria</label><select id="g_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Zelle</option><option>PayPal</option><option>Pago Móvil</option><option>Otro</option></select></div>
           <div class="field"><label>Descripción</label><input id="g_descripcion" placeholder="Detalle del gasto"></div>
           <div class="field"><label>Monto ($)</label><input id="g_monto" type="number" step="0.01" placeholder="0.00"></div>
         </div>
@@ -358,8 +367,24 @@ async function initApp(){
 }
 
 function renderAll(){
-  renderTicker(); renderRanking(); renderMeses(); renderPendientes();
+  renderTicker(); renderSaldosPorCuenta(); renderRanking(); renderMeses(); renderPendientes();
   renderTablaIngresos(); renderTablaGastos(); renderTablaDeudas(); renderTablaCapital();
+}
+
+function renderSaldosPorCuenta(){
+  const fechaCorte = '2026-07-01';
+  const cuentas = [...new Set([...ingresosActivos().map(i=>i.banco), ...GASTOS.map(g=>g.banco)].filter(Boolean))].sort();
+  const body = document.getElementById('tabla_saldos_cuenta');
+  const empty = document.getElementById('saldos_cuenta_empty');
+  if(cuentas.length===0){ body.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+
+  body.innerHTML = cuentas.map(cuenta=>{
+    const ventasCuenta = ingresosActivos().filter(i=>i.banco===cuenta && i.fecha>=fechaCorte).reduce((s,i)=>s+i.monto,0);
+    const gastosCuenta = GASTOS.filter(g=>g.banco===cuenta && g.fecha>=fechaCorte).reduce((s,g)=>s+g.monto,0);
+    const saldo = ventasCuenta - gastosCuenta;
+    return `<tr><td>${cuenta}</td><td class="num">${fmt(ventasCuenta)}</td><td class="num">${fmt(gastosCuenta)}</td><td class="num" style="font-weight:700;color:${saldo>=0?'var(--accent-dark)':'var(--danger)'}">${fmt(saldo)}</td></tr>`;
+  }).join('');
 }
 
 function renderTicker(){
