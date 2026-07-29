@@ -110,6 +110,7 @@
       <button class="tab" data-tab="deudas">Deudas</button>
       <button class="tab" data-tab="capital">Capital</button>
       <button class="tab" data-tab="comisiones">Comisiones</button>
+      <button class="tab" data-tab="cursos">Cursos</button>
       <button class="tab" data-tab="reporte">Reporte</button>
     </div>
     <div id="tab-resumen">
@@ -221,6 +222,12 @@
         </div>
         <div id="g_splits_container" style="display:none;margin-top:14px;">
           <p class="hint" style="margin:0 0 8px;">Indica cuánto de este gasto corresponde a cada curso/módulo. La suma se convierte en el monto total del gasto.</p>
+          <div class="grid cols3" style="margin-bottom:10px;">
+            <div class="field" style="margin-bottom:0;"><label>Repartir en partes iguales entre todos los módulos de:</label><select id="g_split_curso_equitativo" class="select-curso"></select></div>
+            <div class="field" style="display:flex;align-items:flex-end;margin-bottom:0;">
+              <button class="btn btn-ghost btn-sm" id="btn_repartir_equitativo" type="button">Repartir en todos sus módulos</button>
+            </div>
+          </div>
           <div id="g_splits_rows"></div>
           <button class="btn btn-ghost btn-sm" id="btn_add_split" type="button">+ Agregar línea</button>
           <div class="hint" id="g_splits_total" style="margin-top:8px;"></div>
@@ -292,6 +299,31 @@
     </div>
     <div id="tab-comisiones" style="display:none;">
       <div id="comisiones_content"></div>
+    </div>
+    <div id="tab-cursos" style="display:none;">
+      <div class="panel">
+        <h2>Cursos y Módulos</h2>
+        <p class="hint">Define aquí de antemano los módulos de cada curso, aunque todavía no tengan ventas registradas. Así los gastos generales de un curso se reparten entre todos sus módulos reales, no solo entre los que ya tienen ventas.</p>
+        <div class="grid cols3">
+          <div class="field"><label>Nuevo curso</label><input id="matriz_curso_nuevo" placeholder="Nombre exacto del curso"></div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn btn-primary" id="btn_matriz_agregar_curso">Agregar curso</button>
+          </div>
+        </div>
+      </div>
+      <div id="matriz_cursos_content"></div>
+      <div class="panel">
+        <h2>Ventas sin Módulo Asignado</h2>
+        <p class="hint">Ventas que llegaron antes de corregir el enlace con Matrículas (o que se registraron sin módulo). El valor de "Tipo" muchas veces ya trae el módulo real — revísalo, ajústalo si hace falta, y guarda fila por fila o todas de una vez.</p>
+        <div class="actions" style="margin-top:0;margin-bottom:14px;">
+          <button class="btn btn-ghost btn-sm" id="btn_guardar_todas_vsm">Guardar todas las que tengan módulo seleccionado</button>
+        </div>
+        <div class="table-scroll"><table>
+          <thead><tr><th>Fecha</th><th>Curso</th><th>Estudiante</th><th>Tipo (original)</th><th class="num">Monto</th><th>Módulo a asignar</th><th></th></tr></thead>
+          <tbody id="tabla_ventas_sin_modulo"></tbody>
+        </table></div>
+        <div class="empty" id="vsm_empty" style="display:none;">Todas las ventas con curso ya tienen módulo asignado.</div>
+      </div>
     </div>
     <div id="tab-reporte" style="display:none;">
       <div class="panel">
@@ -380,6 +412,125 @@ function moduloSelectDeCurso(cursoSel){
   }
   return null;
 }
+function renderMatrizCursos(){
+  const box = document.getElementById('matriz_cursos_content');
+  if(!box) return;
+  const cursosOrdenados = CURSOS.slice().sort((a,b)=>a.localeCompare(b,'es'));
+  if(cursosOrdenados.length===0){
+    box.innerHTML = '<div class="panel"><p class="hint" style="margin:0;">Aún no hay cursos. Agrega uno arriba.</p></div>';
+    return;
+  }
+  box.innerHTML = cursosOrdenados.map(curso=>{
+    const mods = (MODULOS[curso]||[]).slice().sort((a,b)=>a.localeCompare(b,'es'));
+    const modsHtml = mods.length
+      ? mods.map(m=>`<span class="pill ok" style="margin:0 6px 6px 0;display:inline-flex;align-items:center;gap:6px;">${m}<button type="button" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;padding:0;" onclick="eliminarModuloDeMatriz('${curso.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}')">✕</button></span>`).join('')
+      : '<p class="hint" style="margin:0 0 10px;">Este curso todavía no tiene módulos definidos.</p>';
+    return `
+      <div class="panel">
+        <h2>${curso}</h2>
+        <div style="margin-bottom:12px;">${modsHtml}</div>
+        <div class="grid cols3">
+          <div class="field"><label>Nuevo módulo</label><input class="matriz_modulo_nuevo" data-curso="${curso.replace(/"/g,'&quot;')}" placeholder="Ej. Módulo 3"></div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn btn-ghost btn-sm" type="button" onclick="agregarModuloDesdeMatriz('${curso.replace(/'/g,"\\'")}')">Agregar módulo</button>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;justify-content:flex-end;">
+            <button class="btn btn-ghost btn-sm" type="button" onclick="eliminarCursoDeMatriz('${curso.replace(/'/g,"\\'")}')">Eliminar curso</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+window.agregarModuloDesdeMatriz = function(curso){
+  const input = document.querySelector(`.matriz_modulo_nuevo[data-curso="${CSS.escape(curso)}"]`);
+  const nombre = input ? input.value.trim() : '';
+  if(!nombre){ showToast('Escribe el nombre del módulo.'); return; }
+  agregarModuloSiNoExiste(curso, nombre);
+  renderMatrizCursos();
+  poblarSelectsCurso();
+  document.querySelectorAll('.select-modulo').forEach(sel=>{
+    const cursoSel = cursoSelectDeModulo(sel);
+    if(cursoSel && cursoSel.value===curso) poblarSelectModulo(sel, curso, sel.value);
+  });
+  showToast('Módulo agregado.');
+};
+window.eliminarModuloDeMatriz = function(curso, modulo){
+  if(!confirm(`¿Quitar "${modulo}" de la matriz de "${curso}"? Las ventas o gastos ya guardados con ese módulo no se modifican.`)) return;
+  if(MODULOS[curso]){
+    MODULOS[curso] = MODULOS[curso].filter(m=>m!==modulo);
+    guardarModulos();
+  }
+  renderMatrizCursos();
+  poblarSelectsCurso();
+};
+window.eliminarCursoDeMatriz = function(curso){
+  if(!confirm(`¿Quitar "${curso}" de la lista de cursos? Las ventas o gastos ya guardados con ese curso no se modifican, solo desaparece de las listas desplegables.`)) return;
+  CURSOS = CURSOS.filter(c=>c!==curso);
+  guardarCursos();
+  delete MODULOS[curso];
+  guardarModulos();
+  renderMatrizCursos();
+  poblarSelectsCurso();
+};
+document.getElementById('btn_matriz_agregar_curso').addEventListener('click', ()=>{
+  const input = document.getElementById('matriz_curso_nuevo');
+  const nombre = input.value.trim();
+  if(!nombre){ showToast('Escribe el nombre del curso.'); return; }
+  agregarCursoSiNoExiste(nombre);
+  input.value='';
+  renderMatrizCursos();
+  poblarSelectsCurso();
+  showToast('Curso agregado.');
+});
+const TIPOS_FIJOS_VENTA = ['inscripcion','masterclass','diplomado','entrenamiento','seminario'];
+function renderVentasSinModulo(){
+  const body = document.getElementById('tabla_ventas_sin_modulo');
+  const empty = document.getElementById('vsm_empty');
+  if(!body) return;
+  const rows = INGRESOS.filter(i=>!i.modulo && i.curso).sort((a,b)=>fechaValor(b.fecha)-fechaValor(a.fecha));
+  if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  body.innerHTML = rows.map(i=>{
+    const tipoEsFijo = TIPOS_FIJOS_VENTA.includes(normalizarBusqueda(i.tipo));
+    const modulosDelCurso = MODULOS[i.curso]||[];
+    const coincide = modulosDelCurso.find(m=>normalizarBusqueda(m)===normalizarBusqueda(i.tipo));
+    const sugerido = (!tipoEsFijo && i.tipo) ? (coincide || i.tipo) : '';
+    return `<tr>
+      <td>${fechaCorta(i.fecha)}</td>
+      <td>${i.curso}</td>
+      <td>${i.concepto}</td>
+      <td>${i.tipo||'—'}${tipoEsFijo?' <span class="pill na">Parece tipo, no módulo</span>':''}</td>
+      <td class="num">${fmt(i.monto)}</td>
+      <td><select class="select-modulo vsm-modulo" data-curso="${i.curso.replace(/"/g,'&quot;')}" data-venta-id="${i.id}">${moduloOptionsHtml(i.curso, sugerido)}</select></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="guardarModuloVenta('${i.id}')">Guardar</button></td>
+    </tr>`;
+  }).join('');
+}
+window.guardarModuloVenta = async function(ventaId){
+  const sel = document.querySelector(`.vsm-modulo[data-venta-id="${ventaId}"]`);
+  const modulo = sel ? sel.value.trim() : '';
+  if(!modulo || modulo==='__nuevo__'){ showToast('Selecciona un módulo primero.'); return; }
+  try{
+    await apiPost('Ventas','update',{id:ventaId, data:{modulo}});
+    showToast('Módulo asignado.');
+    await loadAll();
+  }catch(e){ showToast('Error al guardar: '+e.message); }
+};
+document.getElementById('btn_guardar_todas_vsm').addEventListener('click', async ()=>{
+  const selects = [...document.querySelectorAll('.vsm-modulo')].filter(s=>s.value && s.value!=='__nuevo__');
+  if(selects.length===0){ showToast('No hay filas con módulo seleccionado.'); return; }
+  if(!confirm(`¿Guardar el módulo en ${selects.length} venta(s)?`)) return;
+  let ok=0, fallidas=0;
+  for(const sel of selects){
+    try{
+      await apiPost('Ventas','update',{id:sel.dataset.ventaId, data:{modulo:sel.value.trim()}});
+      ok++;
+    }catch(e){ fallidas++; }
+  }
+  showToast(`${ok} venta(s) actualizadas${fallidas>0?`, ${fallidas} fallaron`:''}.`);
+  await loadAll();
+});
 document.addEventListener('change', (e)=>{
   if(!e.target.classList) return;
   if(e.target.classList.contains('select-curso')){
@@ -399,7 +550,7 @@ document.addEventListener('change', (e)=>{
   if(e.target.classList.contains('select-modulo')){
     if(e.target.value==='__nuevo__'){
       const cursoSel = cursoSelectDeModulo(e.target);
-      const cursoVal = cursoSel ? cursoSel.value : '';
+      const cursoVal = cursoSel ? cursoSel.value : (e.target.dataset.curso || '');
       if(!cursoVal || cursoVal==='__nuevo__'){
         showToast('Primero selecciona un curso.');
         e.target.value='';
@@ -481,7 +632,7 @@ async function initApp(){
 }
 function renderAll(){
   renderTicker(); renderSaldosPorCuenta(); renderRanking(); renderMeses(); renderPendientes();
-  renderTablaIngresos(); renderTablaGastos(); renderTablaDeudas(); renderTablaCapital(); renderComisiones();
+  renderTablaIngresos(); renderTablaGastos(); renderTablaDeudas(); renderTablaCapital(); renderComisiones(); renderMatrizCursos(); renderVentasSinModulo();
 }
 function renderSaldosPorCuenta(){
   const fechaCorte = '2026-07-01';
@@ -669,6 +820,18 @@ window.recalcSplitTotal = function(){
   document.getElementById('g_splits_total').textContent = `Total dividido: ${fmt(total)}`;
 };
 document.getElementById('btn_add_split').addEventListener('click', ()=>crearSplitRow());
+document.getElementById('btn_repartir_equitativo').addEventListener('click', ()=>{
+  const curso = document.getElementById('g_split_curso_equitativo').value.trim();
+  if(!curso || curso==='__nuevo__'){ showToast('Selecciona un curso.'); return; }
+  const mods = (MODULOS[curso]||[]).slice().sort((a,b)=>a.localeCompare(b,'es'));
+  if(mods.length===0){ showToast('Ese curso no tiene módulos definidos. Agrégalos en la pestaña "Cursos".'); return; }
+  const totalActual = Number(document.getElementById('g_monto').value)||0;
+  const porModulo = totalActual>0 ? (totalActual/mods.length) : '';
+  document.getElementById('g_splits_rows').innerHTML='';
+  mods.forEach(m=>crearSplitRow(curso, m, porModulo===''?'':porModulo.toFixed(2)));
+  recalcSplitTotal();
+  showToast(`Se crearon ${mods.length} líneas, una por cada módulo de "${curso}".`);
+});
 document.getElementById('g_dividir').addEventListener('change', (e)=>{
   const container = document.getElementById('g_splits_container');
   const cursoWrap = document.getElementById('g_curso_wrap');
@@ -706,6 +869,8 @@ function limpiarFormularioGasto(){
   document.getElementById('g_monto').readOnly=false;
   document.getElementById('g_monto_lock_hint').style.display='none';
   document.getElementById('g_splits_rows').innerHTML='';
+  const selEquitativo = document.getElementById('g_split_curso_equitativo');
+  if(selEquitativo) selEquitativo.value='';
   editingGastoId=null; dividiendoGastoId=null;
   document.getElementById('g_panel_titulo').textContent='Registrar Gasto';
   document.getElementById('g_edit_hint').style.display='none';
@@ -750,6 +915,8 @@ window.dividirGasto = function(id){
   crearSplitRow(g.curso||'', g.modulo||'', g.monto);
   crearSplitRow('', '', '');
   recalcSplitTotal();
+  const selEquitativo = document.getElementById('g_split_curso_equitativo');
+  if(selEquitativo && g.curso) selEquitativo.value = g.curso;
   document.getElementById('g_panel_titulo').textContent='Dividir Gasto entre Cursos/Módulos';
   document.getElementById('g_edit_hint').style.display='block';
   document.getElementById('g_edit_hint').textContent=`Este gasto de ${fmt(g.monto)} se eliminará y se reemplazará por las líneas divididas que definas abajo.`;
@@ -911,18 +1078,17 @@ function renderComisiones(){
     const totalVentasCurso = ventasCursoTodas.reduce((s,v)=>s+v.monto,0);
     const totalGastosCurso = GASTOS.filter(g=>g.curso===curso).reduce((s,g)=>s+g.monto,0);
     const totalUtilidadCurso = totalVentasCurso - totalGastosCurso;
-    const modulos = [...new Set(ventasCursoTodas.map(v=>v.modulo||SIN_MODULO))].sort((a,b)=>{
-      if(a===SIN_MODULO) return 1;
-      if(b===SIN_MODULO) return -1;
-      return a.localeCompare(b,'es');
-    });
+    const modulosMatriz = (MODULOS[curso]||[]);
+    const modulosDesdeVentas = ventasCursoTodas.map(v=>v.modulo).filter(Boolean);
+    let modulosReales = [...new Set([...modulosMatriz, ...modulosDesdeVentas])].sort((a,b)=>a.localeCompare(b,'es'));
+    const hayVentasSinModulo = ventasCursoTodas.some(v=>!v.modulo);
+    const modulos = hayVentasSinModulo ? [...modulosReales, SIN_MODULO] : modulosReales;
     const gastosPorModuloDirecto = {};
     GASTOS.filter(g=>g.curso===curso).forEach(g=>{
       const key = g.modulo || SIN_MODULO;
       gastosPorModuloDirecto[key] = (gastosPorModuloDirecto[key]||0) + g.monto;
     });
     const gastosGeneralesCurso = gastosPorModuloDirecto[SIN_MODULO] || 0;
-    const modulosReales = modulos.filter(m=>m!==SIN_MODULO);
     const gastoGeneralPorModulo = modulosReales.length>0 ? gastosGeneralesCurso/modulosReales.length : 0;
     const totalPorVendedorCurso = {};
     const modulosHtml = modulos.map(modulo=>{
@@ -959,12 +1125,12 @@ function renderComisiones(){
       }).join('');
       return `
         <div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line);">
-          <h3 style="margin:0 0 6px;font-size:15px;">${modulo}</h3>
+          <h3 style="margin:0 0 6px;font-size:15px;">${modulo}${ventasModulo.length===0?' <span class="pill na">Sin ventas todavía</span>':''}</h3>
           <p class="hint" style="margin:0 0 10px;">Ventas: ${fmt(totalVentasModulo)} — Gastos vinculados: ${fmt(gastosModulo)}${notaGeneral} — Utilidad: <b>${fmt(utilidadModulo)}</b> — Comisión Kinller (5% CEO): <b>${fmt(comisionKinllerModulo)}</b></p>
-          <div class="table-scroll"><table>
+          ${ventasModulo.length>0 ? `<div class="table-scroll"><table>
             <thead><tr><th>#</th><th>Estudiante</th><th>Vendedor</th><th class="num">Monto</th><th>Estado</th><th class="num">Comisión (3%)</th></tr></thead>
             <tbody>${filasHtml}</tbody>
-          </table></div>
+          </table></div>` : ''}
         </div>
       `;
     }).join('');
@@ -1048,7 +1214,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
   tab.addEventListener('click', ()=>{
     document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
     tab.classList.add('active');
-    ['resumen','ingresos','gastos','deudas','capital','comisiones','reporte'].forEach(t=>{
+    ['resumen','ingresos','gastos','deudas','capital','comisiones','cursos','reporte'].forEach(t=>{
       document.getElementById('tab-'+t).style.display = (t===tab.dataset.tab) ? 'block' : 'none';
     });
   });
@@ -1057,6 +1223,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
 poblarSelectsCurso();
 poblarSelectModulo(document.getElementById('i_modulo'), '', '');
 poblarSelectModulo(document.getElementById('g_modulo'), '', '');
+renderMatrizCursos();
 initApp();
 </script>
 </body>
