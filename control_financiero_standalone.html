@@ -109,6 +109,7 @@
       <button class="tab" data-tab="gastos">Gastos</button>
       <button class="tab" data-tab="deudas">Deudas</button>
       <button class="tab" data-tab="capital">Capital</button>
+      <button class="tab" data-tab="comisiones">Comisiones</button>
       <button class="tab" data-tab="reporte">Reporte</button>
     </div>
 
@@ -208,6 +209,7 @@
             <option>Sueldos</option><option>Diseñador</option><option>Comisiones</option><option>Arriendo</option><option>Publicidad</option><option>Contador</option><option>Softwares varios</option><option>Pago a Tutores</option><option>Gasto de Curso</option><option>Pago de Deuda</option><option>Otros</option>
           </select></div>
           <div class="field"><label>Cuenta Bancaria</label><select id="g_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Zelle</option><option>PayPal</option><option>Pago Móvil</option><option>Otro</option></select></div>
+          <div class="field"><label>Curso (opcional, para calcular comisiones)</label><input id="g_curso" placeholder="Ej. Diplomado de TDAH"></div>
           <div class="field"><label>Descripción</label><input id="g_descripcion" placeholder="Detalle del gasto"></div>
           <div class="field"><label>Monto ($)</label><input id="g_monto" type="number" step="0.01" placeholder="0.00"></div>
         </div>
@@ -221,9 +223,9 @@
           <button class="btn btn-ghost btn-sm" id="btn_filtrar_gastos">Aplicar</button>
         </div>
         <div class="table-scroll"><table>
-          <thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Cuenta</th><th class="num">Monto</th><th></th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Categoría</th><th>Curso</th><th>Descripción</th><th>Cuenta</th><th class="num">Monto</th><th></th></tr></thead>
           <tbody id="tabla_gastos"></tbody>
-          <tfoot><tr><td colspan="4">TOTAL</td><td class="num" id="tot_gastos_tab">$0.00</td><td></td></tr></tfoot>
+          <tfoot><tr><td colspan="5">TOTAL</td><td class="num" id="tot_gastos_tab">$0.00</td><td></td></tr></tfoot>
         </table></div>
         <div class="empty" id="gastos_empty" style="display:none;">No hay gastos con este filtro.</div>
       </div>
@@ -274,6 +276,10 @@
         </table></div>
         <div class="empty" id="capital_empty" style="display:none;">Aún no hay aportes registrados.</div>
       </div>
+    </div>
+
+    <div id="tab-comisiones" style="display:none;">
+      <div id="comisiones_content"></div>
     </div>
 
     <div id="tab-reporte" style="display:none;">
@@ -368,7 +374,7 @@ async function initApp(){
 
 function renderAll(){
   renderTicker(); renderSaldosPorCuenta(); renderRanking(); renderMeses(); renderPendientes();
-  renderTablaIngresos(); renderTablaGastos(); renderTablaDeudas(); renderTablaCapital();
+  renderTablaIngresos(); renderTablaGastos(); renderTablaDeudas(); renderTablaCapital(); renderComisiones();
 }
 
 function renderSaldosPorCuenta(){
@@ -552,12 +558,13 @@ document.getElementById('btn_guardar_gasto').addEventListener('click', async ()=
   const fecha=document.getElementById('g_fecha').value||new Date().toISOString().slice(0,10);
   const categoria=document.getElementById('g_categoria').value;
   const banco=document.getElementById('g_banco').value;
+  const curso=document.getElementById('g_curso').value.trim();
   const descripcion=document.getElementById('g_descripcion').value.trim();
   const monto=Number(document.getElementById('g_monto').value)||0;
   if(monto<=0){ showToast('El monto debe ser mayor a 0.'); return; }
   try{
-    await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, descripcion, monto}});
-    document.getElementById('g_descripcion').value=''; document.getElementById('g_monto').value='';
+    await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso, descripcion, monto}});
+    document.getElementById('g_curso').value=''; document.getElementById('g_descripcion').value=''; document.getElementById('g_monto').value='';
     showToast('Gasto guardado.');
     await loadAll();
   }catch(e){ showToast('Error al guardar: '+e.message); }
@@ -568,11 +575,12 @@ function renderTablaGastos(){
   let rows=GASTOS.slice();
   if(mes) rows=rows.filter(g=>g.fecha && g.fecha.slice(0,7)===mes);
   if(cat) rows=rows.filter(g=>g.categoria===cat);
+  rows.sort((a,b)=> fechaValor(b.fecha) - fechaValor(a.fecha));
   const body=document.getElementById('tabla_gastos'), empty=document.getElementById('gastos_empty');
   if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; }
   else{
     empty.style.display='none';
-    body.innerHTML = rows.map(g=>`<tr><td>${g.fecha}</td><td>${g.categoria}</td><td>${g.descripcion}</td><td>${g.banco}</td><td class="num">${fmt(g.monto)}</td><td><button class="btn btn-ghost btn-sm" onclick="eliminarGasto('${g.id}')">Eliminar</button></td></tr>`).join('');
+    body.innerHTML = rows.map(g=>`<tr><td>${fechaCorta(g.fecha)}</td><td>${g.categoria}</td><td>${g.curso||'—'}</td><td>${g.descripcion}</td><td>${g.banco}</td><td class="num">${fmt(g.monto)}</td><td><button class="btn btn-ghost btn-sm" onclick="eliminarGasto('${g.id}')">Eliminar</button></td></tr>`).join('');
   }
   document.getElementById('tot_gastos_tab').textContent = fmt(rows.reduce((s,g)=>s+g.monto,0));
 }
@@ -667,6 +675,74 @@ window.eliminarCapital = async function(id){
   await loadAll();
 };
 
+function renderComisiones(){
+  const cursos = [...new Set(ingresosActivos().map(i=>i.curso).filter(Boolean))].sort();
+  const contBox = document.getElementById('comisiones_content');
+  if(!contBox) return;
+  if(cursos.length===0){ contBox.innerHTML = '<div class="panel"><p class="hint" style="margin:0;">Aún no hay ventas registradas.</p></div>'; return; }
+
+  const totalPorVendedor = {};
+  let totalKinller = 0;
+  let totalComisionesGeneral = 0;
+
+  const bloquesHtml = cursos.map(curso=>{
+    const ventasCurso = ingresosActivos().filter(i=>i.curso===curso).slice().sort((a,b)=>b.monto-a.monto);
+    const totalVentasCurso = ventasCurso.reduce((s,v)=>s+v.monto,0);
+    const gastosCurso = GASTOS.filter(g=>g.curso===curso).reduce((s,g)=>s+g.monto,0);
+    const utilidadCurso = totalVentasCurso - gastosCurso;
+    const comisionKinller = utilidadCurso>0 ? utilidadCurso*0.05 : 0;
+    totalKinller += comisionKinller;
+
+    const filasHtml = ventasCurso.map((v,i)=>{
+      const esCeprocenter = i<5;
+      let comision = 0;
+      if(!esCeprocenter && utilidadCurso>0 && totalVentasCurso>0){
+        comision = 0.03 * (v.monto/totalVentasCurso) * utilidadCurso;
+        totalPorVendedor[v.asesor] = (totalPorVendedor[v.asesor]||0) + comision;
+        totalComisionesGeneral += comision;
+      }
+      return `<tr>
+        <td>${i+1}</td>
+        <td>${v.concepto}</td>
+        <td>${v.asesor}</td>
+        <td class="num">${fmt(v.monto)}</td>
+        <td>${esCeprocenter ? '<span class="pill na">Para Ceprocenter</span>' : '<span class="pill ok">Con comisión</span>'}</td>
+        <td class="num">${esCeprocenter ? '—' : fmt(comision)}</td>
+      </tr>`;
+    }).join('');
+
+    return `
+      <div class="panel">
+        <h2>${curso}</h2>
+        <p class="hint">Ventas: ${fmt(totalVentasCurso)} — Gastos vinculados: ${fmt(gastosCurso)} — Utilidad: <b>${fmt(utilidadCurso)}</b> — Comisión Kinller (5% CEO): <b>${fmt(comisionKinller)}</b></p>
+        <div class="table-scroll"><table>
+          <thead><tr><th>#</th><th>Estudiante</th><th>Vendedor</th><th class="num">Monto</th><th>Estado</th><th class="num">Comisión (3%)</th></tr></thead>
+          <tbody>${filasHtml}</tbody>
+        </table></div>
+      </div>
+    `;
+  }).join('');
+
+  const resumenVendedores = Object.entries(totalPorVendedor).sort((a,b)=>b[1]-a[1])
+    .map(([v,m])=>`<tr><td>${v}</td><td class="num">${fmt(m)}</td></tr>`).join('') || '<tr><td colspan="2" style="text-align:center;color:var(--text-dim);">Sin comisiones generadas aún (aún no hay más de 5 ventas en ningún curso).</td></tr>';
+
+  contBox.innerHTML = `
+    <div class="panel">
+      <h2>Resumen de Comisiones</h2>
+      <p class="hint">Las primeras 5 ventas (las más caras) de cada curso son para Ceprocenter. A partir de la 6ta, el vendedor gana 3% de la utilidad proporcional a su venta. Kinller (CEO) se lleva 5% de la utilidad total de cada curso.</p>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Vendedor</th><th class="num">Comisión Total (3%)</th></tr></thead>
+        <tbody>${resumenVendedores}</tbody>
+        <tfoot>
+          <tr><td>Total Comisiones Vendedores</td><td class="num">${fmt(totalComisionesGeneral)}</td></tr>
+          <tr><td>Total Comisión Kinller (5% CEO)</td><td class="num">${fmt(totalKinller)}</td></tr>
+        </tfoot>
+      </table></div>
+    </div>
+    ${bloquesHtml}
+  `;
+}
+
 document.getElementById('btn_todo_periodo').addEventListener('click', ()=>{ document.getElementById('rep_mes').value=''; generarReporte(); });
 document.getElementById('btn_generar_reporte').addEventListener('click', generarReporte);
 
@@ -722,7 +798,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
   tab.addEventListener('click', ()=>{
     document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
     tab.classList.add('active');
-    ['resumen','ingresos','gastos','deudas','capital','reporte'].forEach(t=>{
+    ['resumen','ingresos','gastos','deudas','capital','comisiones','reporte'].forEach(t=>{
       document.getElementById('tab-'+t).style.display = (t===tab.dataset.tab) ? 'block' : 'none';
     });
   });
