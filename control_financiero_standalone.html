@@ -223,9 +223,12 @@
         <div id="g_splits_container" style="display:none;margin-top:14px;">
           <p class="hint" style="margin:0 0 8px;">Indica cuánto de este gasto corresponde a cada curso/módulo. La suma se convierte en el monto total del gasto.</p>
           <div class="grid cols3" style="margin-bottom:10px;">
-            <div class="field" style="margin-bottom:0;"><label>Repartir en partes iguales entre todos los módulos de:</label><select id="g_split_curso_equitativo" class="select-curso"></select></div>
+            <div class="field" style="margin-bottom:0;">
+              <label>Repartir en partes iguales entre TODOS los módulos de (elige uno o varios cursos, con Ctrl/Cmd+clic):</label>
+              <select id="g_split_cursos_equitativo" multiple size="5" style="min-height:110px;"></select>
+            </div>
             <div class="field" style="display:flex;align-items:flex-end;margin-bottom:0;">
-              <button class="btn btn-ghost btn-sm" id="btn_repartir_equitativo" type="button">Repartir en todos sus módulos</button>
+              <button class="btn btn-ghost btn-sm" id="btn_repartir_equitativo" type="button">Repartir entre esos módulos</button>
             </div>
           </div>
           <div id="g_splits_rows"></div>
@@ -298,6 +301,14 @@
       </div>
     </div>
     <div id="tab-comisiones" style="display:none;">
+      <div class="panel">
+        <h2>Buscar Comisión</h2>
+        <p class="hint">Elige primero el curso y luego el módulo para ver solo esa información, en vez de la lista completa.</p>
+        <div class="grid cols3">
+          <div class="field"><label>Curso</label><select id="comisiones_filtro_curso"><option value="">Todos los cursos</option></select></div>
+          <div class="field"><label>Módulo</label><select id="comisiones_filtro_modulo"><option value="">Todos los módulos</option></select></div>
+        </div>
+      </div>
       <div id="comisiones_content"></div>
     </div>
     <div id="tab-cursos" style="display:none;">
@@ -308,6 +319,9 @@
           <div class="field"><label>Nuevo curso</label><input id="matriz_curso_nuevo" placeholder="Nombre exacto del curso"></div>
           <div class="field" style="display:flex;align-items:flex-end;">
             <button class="btn btn-primary" id="btn_matriz_agregar_curso">Agregar curso</button>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn btn-ghost" id="btn_importar_modulos_matriculas">Importar cursos/módulos desde Matrículas</button>
           </div>
         </div>
       </div>
@@ -380,6 +394,14 @@ function poblarSelectsCurso(){
     const val = sel.value;
     sel.innerHTML = cursoOptionsHtml(val);
   });
+  poblarSelectCursosMultiple();
+}
+function poblarSelectCursosMultiple(){
+  const sel = document.getElementById('g_split_cursos_equitativo');
+  if(!sel) return;
+  const seleccionActual = [...sel.selectedOptions].map(o=>o.value);
+  const cursosOrdenados = CURSOS.slice().sort((a,b)=>a.localeCompare(b,'es'));
+  sel.innerHTML = cursosOrdenados.map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${seleccionActual.includes(c)?'selected':''}>${c}</option>`).join('');
 }
 let MODULOS = JSON.parse(localStorage.getItem('cepro_modulos')||'{}');
 function guardarModulos(){ localStorage.setItem('cepro_modulos', JSON.stringify(MODULOS)); }
@@ -392,16 +414,17 @@ function agregarModuloSiNoExiste(curso, modulo){
 function sincronizarModulosDesdeDatos(){
   [...INGRESOS, ...GASTOS].forEach(x=>{ if(x.curso && x.modulo) agregarModuloSiNoExiste(x.curso, x.modulo); });
 }
-function moduloOptionsHtml(curso, seleccionado){
+function moduloOptionsHtml(curso, seleccionado, placeholder){
   const mods = (MODULOS[curso]||[]).slice().sort((a,b)=>a.localeCompare(b,'es'));
-  let html = `<option value="">— Selecciona un módulo —</option>`;
+  let html = `<option value="">${placeholder || '— Selecciona un módulo —'}</option>`;
   html += mods.map(m=>`<option value="${m.replace(/"/g,'&quot;')}" ${m===seleccionado?'selected':''}>${m}</option>`).join('');
   html += `<option value="__nuevo__">+ Agregar nuevo módulo...</option>`;
   return html;
 }
-function poblarSelectModulo(selectModuloEl, curso, seleccionado){
+function poblarSelectModulo(selectModuloEl, curso, seleccionado, placeholder){
   if(!selectModuloEl) return;
-  selectModuloEl.innerHTML = moduloOptionsHtml(curso||'', seleccionado!==undefined?seleccionado:selectModuloEl.value);
+  const ph = placeholder || (selectModuloEl.id==='g_modulo' ? 'Todo el curso (repartir automático entre sus módulos)' : undefined);
+  selectModuloEl.innerHTML = moduloOptionsHtml(curso||'', seleccionado!==undefined?seleccionado:selectModuloEl.value, ph);
 }
 function cursoSelectDeModulo(moduloSel){
   if(moduloSel.id==='i_modulo') return document.getElementById('i_curso');
@@ -491,6 +514,30 @@ document.getElementById('btn_matriz_agregar_curso').addEventListener('click', ()
   renderMatrizCursos();
   poblarSelectsCurso();
   showToast('Curso agregado.');
+});
+document.getElementById('btn_importar_modulos_matriculas').addEventListener('click', async ()=>{
+  if(!MATRICULAS_API_URL){ showToast('Primero guarda la URL de Matrículas (más abajo, en "Ventas sin Módulo Asignado").'); return; }
+  showToast('Importando cursos y módulos desde Matrículas...');
+  try{
+    const res = await fetch(`${MATRICULAS_API_URL}?sheet=Modulos`);
+    const filas = await res.json();
+    if(filas.error) throw new Error(filas.error);
+    let cursosNuevos = 0, modulosNuevos = 0;
+    filas.forEach(f=>{
+      if(!f.curso) return;
+      if(!CURSOS.some(c=>normalizarBusqueda(c)===normalizarBusqueda(f.curso))) cursosNuevos++;
+      agregarCursoSiNoExiste(f.curso);
+      if(f.modulo){
+        if(!(MODULOS[f.curso]||[]).some(m=>normalizarBusqueda(m)===normalizarBusqueda(f.modulo))) modulosNuevos++;
+        agregarModuloSiNoExiste(f.curso, f.modulo);
+      }
+    });
+    renderMatrizCursos();
+    poblarSelectsCurso();
+    showToast(`Importado: ${cursosNuevos} curso(s) y ${modulosNuevos} módulo(s) nuevo(s).`);
+  }catch(e){
+    showToast('No se pudo importar: '+e.message);
+  }
 });
 const TIPOS_FIJOS_VENTA = ['inscripcion','masterclass','diplomado','entrenamiento','seminario'];
 let MATRICULAS_API_URL = localStorage.getItem('cepro_matriculas_api_url') || '';
@@ -884,16 +931,21 @@ window.recalcSplitTotal = function(){
 };
 document.getElementById('btn_add_split').addEventListener('click', ()=>crearSplitRow());
 document.getElementById('btn_repartir_equitativo').addEventListener('click', ()=>{
-  const curso = document.getElementById('g_split_curso_equitativo').value.trim();
-  if(!curso || curso==='__nuevo__'){ showToast('Selecciona un curso.'); return; }
-  const mods = (MODULOS[curso]||[]).slice().sort((a,b)=>a.localeCompare(b,'es'));
-  if(mods.length===0){ showToast('Ese curso no tiene módulos definidos. Agrégalos en la pestaña "Cursos".'); return; }
+  const selCursos = document.getElementById('g_split_cursos_equitativo');
+  const cursosElegidos = [...selCursos.selectedOptions].map(o=>o.value).filter(Boolean);
+  if(cursosElegidos.length===0){ showToast('Selecciona al menos un curso.'); return; }
+  const pares = [];
+  cursosElegidos.forEach(curso=>{
+    const mods = (MODULOS[curso]||[]).slice().sort((a,b)=>a.localeCompare(b,'es'));
+    mods.forEach(m=>pares.push({curso, modulo:m}));
+  });
+  if(pares.length===0){ showToast('Esos cursos no tienen módulos definidos. Agrégalos en la pestaña "Cursos".'); return; }
   const totalActual = Number(document.getElementById('g_monto').value)||0;
-  const porModulo = totalActual>0 ? (totalActual/mods.length) : '';
+  const porLinea = totalActual>0 ? (totalActual/pares.length) : '';
   document.getElementById('g_splits_rows').innerHTML='';
-  mods.forEach(m=>crearSplitRow(curso, m, porModulo===''?'':porModulo.toFixed(2)));
+  pares.forEach(p=>crearSplitRow(p.curso, p.modulo, porLinea===''?'':porLinea.toFixed(2)));
   recalcSplitTotal();
-  showToast(`Se crearon ${mods.length} líneas, una por cada módulo de "${curso}".`);
+  showToast(`Se crearon ${pares.length} línea(s) entre ${cursosElegidos.length} curso(s).`);
 });
 document.getElementById('g_dividir').addEventListener('change', (e)=>{
   const container = document.getElementById('g_splits_container');
@@ -932,8 +984,8 @@ function limpiarFormularioGasto(){
   document.getElementById('g_monto').readOnly=false;
   document.getElementById('g_monto_lock_hint').style.display='none';
   document.getElementById('g_splits_rows').innerHTML='';
-  const selEquitativo = document.getElementById('g_split_curso_equitativo');
-  if(selEquitativo) selEquitativo.value='';
+  const selCursosEquitativo = document.getElementById('g_split_cursos_equitativo');
+  if(selCursosEquitativo) [...selCursosEquitativo.options].forEach(o=>o.selected=false);
   editingGastoId=null; dividiendoGastoId=null;
   document.getElementById('g_panel_titulo').textContent='Registrar Gasto';
   document.getElementById('g_edit_hint').style.display='none';
@@ -978,8 +1030,8 @@ window.dividirGasto = function(id){
   crearSplitRow(g.curso||'', g.modulo||'', g.monto);
   crearSplitRow('', '', '');
   recalcSplitTotal();
-  const selEquitativo = document.getElementById('g_split_curso_equitativo');
-  if(selEquitativo && g.curso) selEquitativo.value = g.curso;
+  const selCursosEquitativo = document.getElementById('g_split_cursos_equitativo');
+  if(selCursosEquitativo && g.curso) [...selCursosEquitativo.options].forEach(o=>{ o.selected = (o.value===g.curso); });
   document.getElementById('g_panel_titulo').textContent='Dividir Gasto entre Cursos/Módulos';
   document.getElementById('g_edit_hint').style.display='block';
   document.getElementById('g_edit_hint').textContent=`Este gasto de ${fmt(g.monto)} se eliminará y se reemplazará por las líneas divididas que definas abajo.`;
@@ -1127,11 +1179,38 @@ window.eliminarCapital = async function(id){
   showToast('Aporte eliminado.');
   await loadAll();
 };
+function esInscripcion(m){ return normalizarBusqueda(m)==='inscripcion'; }
+function poblarFiltroComisiones(){
+  const sel = document.getElementById('comisiones_filtro_curso');
+  if(!sel) return;
+  const cursosConVentas = [...new Set(ingresosActivos().map(i=>i.curso).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const valActual = sel.value;
+  sel.innerHTML = '<option value="">Todos los cursos</option>' + cursosConVentas.map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${c===valActual?'selected':''}>${c}</option>`).join('');
+}
+function poblarFiltroModuloComisiones(){
+  const selCurso = document.getElementById('comisiones_filtro_curso');
+  const selModulo = document.getElementById('comisiones_filtro_modulo');
+  if(!selCurso || !selModulo) return;
+  const curso = selCurso.value;
+  if(!curso){ selModulo.innerHTML = '<option value="">Todos los módulos</option>'; selModulo.disabled = true; return; }
+  selModulo.disabled = false;
+  const ventasCurso = ingresosActivos().filter(i=>i.curso===curso);
+  const modulosMatriz = (MODULOS[curso]||[]).filter(m=>!esInscripcion(m));
+  const modulosVentas = ventasCurso.map(v=>v.modulo).filter(Boolean).filter(m=>!esInscripcion(m));
+  const mods = [...new Set([...modulosMatriz, ...modulosVentas])].sort((a,b)=>a.localeCompare(b,'es'));
+  const valActual = selModulo.value;
+  selModulo.innerHTML = '<option value="">Todos los módulos</option>' + mods.map(m=>`<option value="${m.replace(/"/g,'&quot;')}" ${m===valActual?'selected':''}>${m}</option>`).join('');
+}
 function renderComisiones(){
-  const cursos = [...new Set(ingresosActivos().map(i=>i.curso).filter(Boolean))].sort();
+  poblarFiltroComisiones();
+  poblarFiltroModuloComisiones();
+  const filtroCurso = document.getElementById('comisiones_filtro_curso') ? document.getElementById('comisiones_filtro_curso').value : '';
+  const filtroModulo = document.getElementById('comisiones_filtro_modulo') ? document.getElementById('comisiones_filtro_modulo').value : '';
+  let cursos = [...new Set(ingresosActivos().map(i=>i.curso).filter(Boolean))].sort();
+  if(filtroCurso) cursos = cursos.filter(c=>c===filtroCurso);
   const contBox = document.getElementById('comisiones_content');
   if(!contBox) return;
-  if(cursos.length===0){ contBox.innerHTML = '<div class="panel"><p class="hint" style="margin:0;">Aún no hay ventas registradas.</p></div>'; return; }
+  if(cursos.length===0){ contBox.innerHTML = `<div class="panel"><p class="hint" style="margin:0;">${filtroCurso?'Este curso no tiene ventas registradas.':'Aún no hay ventas registradas.'}</p></div>`; return; }
   const totalPorVendedor = {};
   let totalKinller = 0;
   let totalComisionesGeneral = 0;
@@ -1141,11 +1220,12 @@ function renderComisiones(){
     const totalVentasCurso = ventasCursoTodas.reduce((s,v)=>s+v.monto,0);
     const totalGastosCurso = GASTOS.filter(g=>g.curso===curso).reduce((s,g)=>s+g.monto,0);
     const totalUtilidadCurso = totalVentasCurso - totalGastosCurso;
-    const modulosMatriz = (MODULOS[curso]||[]);
-    const modulosDesdeVentas = ventasCursoTodas.map(v=>v.modulo).filter(Boolean);
+    const modulosMatriz = (MODULOS[curso]||[]).filter(m=>!esInscripcion(m));
+    const modulosDesdeVentas = ventasCursoTodas.map(v=>v.modulo).filter(Boolean).filter(m=>!esInscripcion(m));
     let modulosReales = [...new Set([...modulosMatriz, ...modulosDesdeVentas])].sort((a,b)=>a.localeCompare(b,'es'));
     const hayVentasSinModulo = ventasCursoTodas.some(v=>!v.modulo);
-    const modulos = hayVentasSinModulo ? [...modulosReales, SIN_MODULO] : modulosReales;
+    let modulos = hayVentasSinModulo ? [...modulosReales, SIN_MODULO] : modulosReales;
+    if(filtroCurso && filtroModulo) modulos = modulos.filter(m=>m===filtroModulo);
     const gastosPorModuloDirecto = {};
     GASTOS.filter(g=>g.curso===curso).forEach(g=>{
       const key = g.modulo || SIN_MODULO;
@@ -1217,7 +1297,7 @@ function renderComisiones(){
   contBox.innerHTML = `
     <div class="panel">
       <h2>Resumen de Comisiones</h2>
-      <p class="hint">Las primeras 5 ventas (las más caras) de cada módulo son para Ceprocenter. A partir de la 6ta, el vendedor gana 3% de la utilidad proporcional a su venta. Kinller (CEO) se lleva 5% de la utilidad de cada módulo. Las ventas sin módulo asignado se agrupan bajo "(Sin módulo)" dentro de su curso. Los gastos registrados sin módulo (gastos generales del curso) se reparten en partes iguales entre todos sus módulos.</p>
+      <p class="hint">Las primeras 5 ventas (las más caras) de cada módulo son para Ceprocenter. A partir de la 6ta, el vendedor gana 3% de la utilidad proporcional a su venta. Kinller (CEO) se lleva 5% de la utilidad de cada módulo. Las ventas sin módulo asignado se agrupan bajo "(Sin módulo)" dentro de su curso. Los gastos registrados sin módulo (gastos generales del curso) se reparten en partes iguales entre todos sus módulos. Las ventas de "Inscripción" no entran en este cálculo de comisiones.</p>
       <div class="table-scroll"><table>
         <thead><tr><th>Vendedor</th><th class="num">Comisión Total (3%)</th></tr></thead>
         <tbody>${resumenVendedores}</tbody>
@@ -1232,6 +1312,11 @@ function renderComisiones(){
 }
 document.getElementById('btn_todo_periodo').addEventListener('click', ()=>{ document.getElementById('rep_mes').value=''; generarReporte(); });
 document.getElementById('btn_generar_reporte').addEventListener('click', generarReporte);
+document.getElementById('comisiones_filtro_curso').addEventListener('change', ()=>{
+  document.getElementById('comisiones_filtro_modulo').value='';
+  renderComisiones();
+});
+document.getElementById('comisiones_filtro_modulo').addEventListener('change', renderComisiones);
 function generarReporte(){
   const mes=document.getElementById('rep_mes').value;
   const filtroLabel = mes ? new Date(mes+'-01').toLocaleDateString('es-EC',{month:'long',year:'numeric'}) : 'Histórico completo';
