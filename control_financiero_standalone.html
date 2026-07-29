@@ -84,7 +84,6 @@
 </head>
 <body>
 <div class="wrap">
-
   <div class="top">
     <div>
       <h1>Control Financiero <span class="accent">/ Ceprocenter</span></h1>
@@ -92,17 +91,14 @@
     </div>
     <button class="btn btn-ghost btn-sm" id="btn_config">⚙ Configuración</button>
   </div>
-
   <div class="setup-banner" id="setup_banner" style="display:none;">
     <h3>Configura tu conexión</h3>
     <p class="hint" style="margin:0 0 6px;">Pega aquí la URL de tu Apps Script (termina en /exec). Se guarda solo en este dispositivo/navegador.</p>
     <input id="api_url_input" placeholder="https://script.google.com/macros/s/xxxxx/exec">
     <button class="btn btn-primary btn-sm" id="btn_guardar_config">Guardar y Conectar</button>
   </div>
-
   <div id="app_content" style="display:none;">
     <div class="ticker" id="ticker"></div>
-
     <div class="tabs">
       <button class="tab active" data-tab="resumen">Resumen</button>
       <button class="tab" data-tab="ingresos">Ventas</button>
@@ -112,7 +108,6 @@
       <button class="tab" data-tab="comisiones">Comisiones</button>
       <button class="tab" data-tab="reporte">Reporte</button>
     </div>
-
     <div id="tab-resumen">
       <div class="panel">
         <h2>Saldos por Cuenta / Forma de Pago</h2>
@@ -144,7 +139,6 @@
         <div class="empty" id="pendientes_empty" style="display:none;">Todo confirmado. Sin pendientes.</div>
       </div>
     </div>
-
     <div id="tab-ingresos" style="display:none;">
       <div class="panel">
         <h2>Registrar Venta</h2>
@@ -199,21 +193,36 @@
         <div class="empty" id="ingresos_empty" style="display:none;">No hay ventas con este filtro.</div>
       </div>
     </div>
-
     <div id="tab-gastos" style="display:none;">
       <div class="panel">
-        <h2>Registrar Gasto</h2>
+        <h2 id="g_panel_titulo">Registrar Gasto</h2>
+        <p class="hint" id="g_edit_hint" style="display:none;"></p>
         <div class="grid cols3">
           <div class="field"><label>Fecha</label><input id="g_fecha" type="date"></div>
           <div class="field"><label>Categoría</label><select id="g_categoria">
             <option>Sueldos</option><option>Diseñador</option><option>Comisiones</option><option>Arriendo</option><option>Publicidad</option><option>Contador</option><option>Softwares varios</option><option>Pago a Tutores</option><option>Gasto de Curso</option><option>Pago de Deuda</option><option>Otros</option>
           </select></div>
           <div class="field"><label>Cuenta Bancaria</label><select id="g_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Zelle</option><option>PayPal</option><option>Pago Móvil</option><option>Otro</option></select></div>
-          <div class="field"><label>Curso (opcional, para calcular comisiones)</label><input id="g_curso" placeholder="Ej. Diplomado de TDAH"></div>
+          <div class="field" id="g_curso_wrap"><label>Curso (opcional, para calcular comisiones)</label><input id="g_curso" placeholder="Ej. Diplomado de TDAH"></div>
           <div class="field"><label>Descripción</label><input id="g_descripcion" placeholder="Detalle del gasto"></div>
-          <div class="field"><label>Monto ($)</label><input id="g_monto" type="number" step="0.01" placeholder="0.00"></div>
+          <div class="field"><label>Monto ($) <span id="g_monto_lock_hint" style="display:none;font-weight:400;text-transform:none;color:var(--text-dim);">(suma automática)</span></label><input id="g_monto" type="number" step="0.01" placeholder="0.00"></div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer;">
+              <input type="checkbox" id="g_dividir" style="width:18px;height:18px;">
+              Dividir este gasto entre varios cursos
+            </label>
+          </div>
         </div>
-        <div class="actions"><button class="btn btn-primary" id="btn_guardar_gasto">Guardar Gasto</button></div>
+        <div id="g_splits_container" style="display:none;margin-top:14px;">
+          <p class="hint" style="margin:0 0 8px;">Indica cuánto de este gasto corresponde a cada curso. La suma se convierte en el monto total del gasto.</p>
+          <div id="g_splits_rows"></div>
+          <button class="btn btn-ghost btn-sm" id="btn_add_split" type="button">+ Agregar curso</button>
+          <div class="hint" id="g_splits_total" style="margin-top:8px;"></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="btn_guardar_gasto">Guardar Gasto</button>
+          <button class="btn btn-ghost" id="btn_cancelar_gasto" style="display:none;">Cancelar</button>
+        </div>
       </div>
       <div class="panel">
         <h2>Historial de Gastos</h2>
@@ -230,7 +239,6 @@
         <div class="empty" id="gastos_empty" style="display:none;">No hay gastos con este filtro.</div>
       </div>
     </div>
-
     <div id="tab-deudas" style="display:none;">
       <div class="panel">
         <h2>Registrar Deuda / Tarjeta de Crédito</h2>
@@ -256,7 +264,6 @@
         <div class="empty" id="deudas_empty" style="display:none;">No tienes deudas registradas.</div>
       </div>
     </div>
-
     <div id="tab-capital" style="display:none;">
       <div class="panel">
         <h2>Registrar Aporte de Capital</h2>
@@ -277,11 +284,9 @@
         <div class="empty" id="capital_empty" style="display:none;">Aún no hay aportes registrados.</div>
       </div>
     </div>
-
     <div id="tab-comisiones" style="display:none;">
       <div id="comisiones_content"></div>
     </div>
-
     <div id="tab-reporte" style="display:none;">
       <div class="panel">
         <h2>Reporte Financiero</h2>
@@ -299,17 +304,13 @@
     </div>
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
-
 <script>
 let API_URL = localStorage.getItem('cepro_api_url') || '';
 let CAPITAL=[], INGRESOS=[], GASTOS=[], DEUDAS=[];
-
 function fmt(n){ return '$' + (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2}); }
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3200); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
-
 document.getElementById('btn_config').addEventListener('click', ()=>{
   const b = document.getElementById('setup_banner');
   b.style.display = b.style.display==='none' ? 'block' : 'none';
@@ -323,7 +324,6 @@ document.getElementById('btn_guardar_config').addEventListener('click', async ()
   showToast('Conectando...');
   await initApp();
 });
-
 async function apiGet(sheet){
   const res = await fetch(`${API_URL}?sheet=${sheet}`);
   const json = await res.json();
@@ -340,11 +340,9 @@ async function apiPost(sheet, action, extra){
   if(json.error) throw new Error(json.error);
   return json;
 }
-
 function normBool(v){ return v===true || v==='TRUE' || v==='true' || v===1 || v==='1'; }
 function normNum(v){ return Number(v)||0; }
 function ingresosActivos(){ return INGRESOS.filter(i=>!i.esHistorica); }
-
 async function loadAll(){
   const [ing, gas, deu, cap] = await Promise.all([
     apiGet('Ventas'), apiGet('Gastos'), apiGet('Deudas'), apiGet('Capital')
@@ -355,7 +353,6 @@ async function loadAll(){
   CAPITAL = cap.map(c=>({...c, monto:normNum(c.monto)}));
   renderAll();
 }
-
 async function initApp(){
   if(!API_URL){
     document.getElementById('setup_banner').style.display='block';
@@ -371,12 +368,10 @@ async function initApp(){
     document.getElementById('setup_banner').style.display='block';
   }
 }
-
 function renderAll(){
   renderTicker(); renderSaldosPorCuenta(); renderRanking(); renderMeses(); renderPendientes();
   renderTablaIngresos(); renderTablaGastos(); renderTablaDeudas(); renderTablaCapital(); renderComisiones();
 }
-
 function renderSaldosPorCuenta(){
   const fechaCorte = '2026-07-01';
   const cuentas = [...new Set([...ingresosActivos().map(i=>i.banco), ...GASTOS.map(g=>g.banco)].filter(Boolean))].sort();
@@ -384,7 +379,6 @@ function renderSaldosPorCuenta(){
   const empty = document.getElementById('saldos_cuenta_empty');
   if(cuentas.length===0){ body.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
-
   body.innerHTML = cuentas.map(cuenta=>{
     const ventasCuenta = ingresosActivos().filter(i=>i.banco===cuenta && i.fecha>=fechaCorte).reduce((s,i)=>s+i.monto,0);
     const gastosCuenta = GASTOS.filter(g=>g.banco===cuenta && g.fecha>=fechaCorte).reduce((s,g)=>s+g.monto,0);
@@ -392,7 +386,6 @@ function renderSaldosPorCuenta(){
     return `<tr><td>${cuenta}</td><td class="num">${fmt(ventasCuenta)}</td><td class="num">${fmt(gastosCuenta)}</td><td class="num" style="font-weight:700;color:${saldo>=0?'var(--accent-dark)':'var(--danger)'}">${fmt(saldo)}</td></tr>`;
   }).join('');
 }
-
 function renderTicker(){
   const now = new Date();
   const totalCapital = CAPITAL.reduce((s,c)=>s+c.monto,0);
@@ -413,7 +406,6 @@ function renderTicker(){
     <div class="tick"><div class="n ${totalDeuda>0?'neg':''}">${fmt(totalDeuda)}</div><div class="l">Deuda Pendiente</div></div>
     <div class="tick"><div class="n ${pendientes.length?'warn':''}">${pendientes.length}</div><div class="l">Por Confirmar (${fmt(pendienteMonto)})</div></div>`;
 }
-
 function renderRanking(){
   const map = {};
   ingresosActivos().forEach(i=>{ const key=i.curso||'(Sin curso)'; if(!map[key])map[key]={monto:0,count:0}; map[key].monto+=i.monto; map[key].count+=1; });
@@ -424,7 +416,6 @@ function renderRanking(){
   const max = arr[0].monto||1;
   box.innerHTML = arr.map(r=>`<div class="bar-row"><div class="bar-label">${r.curso}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(6,(r.monto/max*100))}%"><span>${fmt(r.monto)}</span></div></div><div class="bar-count">${r.count} venta${r.count!==1?'s':''}</div></div>`).join('');
 }
-
 function renderMeses(){
   const now=new Date(); const rows=[];
   for(let i=5;i>=0;i--){
@@ -435,7 +426,6 @@ function renderMeses(){
   }
   document.getElementById('tabla_meses').innerHTML = rows.map(r=>`<tr><td style="text-transform:capitalize;">${r.label}</td><td class="num">${fmt(r.ing)}</td><td class="num">${fmt(r.gas)}</td><td class="num" style="color:${r.util<0?'var(--danger)':'var(--accent)'}">${fmt(r.util)}</td></tr>`).join('');
 }
-
 function renderPendientes(){
   const pend = INGRESOS.filter(i=>!i.confirmado).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
   const body=document.getElementById('tabla_pendientes'), empty=document.getElementById('pendientes_empty');
@@ -443,13 +433,11 @@ function renderPendientes(){
   empty.style.display='none';
   body.innerHTML = pend.map(p=>`<tr><td>${p.fecha}</td><td>${p.concepto}</td><td>${p.curso}</td><td>${p.banco}</td><td class="num">${fmt(p.monto)}</td><td><button class="btn btn-ghost btn-sm" onclick="confirmarIngreso('${p.id}')">Confirmar</button></td></tr>`).join('');
 }
-
 window.confirmarIngreso = async function(id){
   await apiPost('Ventas','update',{id, data:{confirmado:true}});
   showToast('Venta confirmada.');
   await loadAll();
 };
-
 document.getElementById('btn_guardar_ingreso').addEventListener('click', async ()=>{
   const fecha=document.getElementById('i_fecha').value||new Date().toISOString().slice(0,10);
   const tipo=document.getElementById('i_tipo').value;
@@ -470,37 +458,31 @@ document.getElementById('btn_guardar_ingreso').addEventListener('click', async (
     await loadAll();
   }catch(e){ showToast('Error al guardar: '+e.message); }
 });
-
 function fechaCorta(fechaStr){
   if(!fechaStr) return '—';
   const d = new Date(fechaStr + (fechaStr.length<=10 ? 'T00:00:00' : ''));
   if(isNaN(d.getTime())) return fechaStr;
   return d.toLocaleDateString('es-EC', {day:'2-digit', month:'2-digit', year:'numeric'});
 }
-
 function acortarModulo(texto){
   if(!texto) return '';
   const match = texto.match(/m[oó]dulo\s*(\d+)/i) || texto.match(/(\d+)/);
   if(match) return 'Módulo ' + match[1];
   return texto.length > 15 ? texto.slice(0,15).trim() + '…' : texto;
 }
-
 function normalizarBusqueda(t){
-  return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  return (t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
 }
-
 function fechaValor(f){
   if(!f) return 0;
   const partes = String(f).slice(0,10).split('-');
   if(partes.length!==3) return 0;
   return Number(partes[0])*10000 + Number(partes[1])*100 + Number(partes[2]);
 }
-
 function renderTablaIngresos(){
   const mes=document.getElementById('filt_i_mes').value, estado=document.getElementById('filt_i_estado').value;
   const metodo=document.getElementById('filt_i_metodo').value, bancoF=document.getElementById('filt_i_banco').value;
   const estudianteBuscado=normalizarBusqueda(document.getElementById('filt_i_estudiante').value.trim());
-
   const metodosDisponibles = [...new Set(INGRESOS.map(i=>i.metodoPago).filter(Boolean))].sort();
   const bancosDisponibles = [...new Set(INGRESOS.map(i=>i.banco).filter(Boolean))].sort();
   const selMetodo = document.getElementById('filt_i_metodo'), selBanco = document.getElementById('filt_i_banco');
@@ -509,7 +491,6 @@ function renderTablaIngresos(){
     selBanco.innerHTML = '<option value="">Todas</option>' + bancosDisponibles.map(b=>`<option>${b}</option>`).join('');
     selMetodo.dataset.poblado='si'; selBanco.dataset.poblado='si';
   }
-
   let rows=INGRESOS.slice();
   if(mes) rows=rows.filter(i=>i.fecha && i.fecha.slice(0,7)===mes);
   if(estado==='no') rows=rows.filter(i=>!i.confirmado);
@@ -518,7 +499,6 @@ function renderTablaIngresos(){
   if(bancoF) rows=rows.filter(i=>i.banco===bancoF);
   if(estudianteBuscado) rows=rows.filter(i=>normalizarBusqueda(i.concepto).includes(estudianteBuscado));
   rows.sort((a,b)=> fechaValor(b.fecha) - fechaValor(a.fecha));
-
   const resumenBox = document.getElementById('resumen_estudiante_filtrado');
   if(estudianteBuscado && rows.length>0){
     const totalEst = rows.reduce((s,i)=>s+i.monto,0);
@@ -528,7 +508,6 @@ function renderTablaIngresos(){
   }else{
     resumenBox.innerHTML = '';
   }
-
   const body=document.getElementById('tabla_ingresos'), empty=document.getElementById('ingresos_empty');
   if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; }
   else{
@@ -553,23 +532,145 @@ window.eliminarIngreso = async function(id){
 };
 document.getElementById('btn_filtrar_ingresos').addEventListener('click', renderTablaIngresos);
 document.getElementById('filt_i_estudiante').addEventListener('input', renderTablaIngresos);
-
+let editingGastoId = null;
+let dividiendoGastoId = null;
+function crearSplitRow(curso='', monto=''){
+  const row = document.createElement('div');
+  row.style.display = 'grid';
+  row.style.gridTemplateColumns = '1fr 160px 40px';
+  row.style.gap = '10px';
+  row.style.marginBottom = '8px';
+  row.innerHTML = `
+    <div class="field" style="margin-bottom:0;"><input class="split-curso" placeholder="Curso" value="${curso}"></div>
+    <div class="field" style="margin-bottom:0;"><input class="split-monto" type="number" step="0.01" placeholder="0.00" value="${monto}"></div>
+    <button class="btn btn-ghost btn-sm" type="button" onclick="this.parentElement.remove(); recalcSplitTotal();">✕</button>
+  `;
+  row.querySelectorAll('input').forEach(inp=>inp.addEventListener('input', recalcSplitTotal));
+  document.getElementById('g_splits_rows').appendChild(row);
+}
+window.recalcSplitTotal = function(){
+  const montos = [...document.querySelectorAll('.split-monto')].map(i=>Number(i.value)||0);
+  const total = montos.reduce((s,m)=>s+m,0);
+  document.getElementById('g_monto').value = total ? total.toFixed(2) : '';
+  document.getElementById('g_splits_total').textContent = `Total dividido: ${fmt(total)}`;
+};
+document.getElementById('btn_add_split').addEventListener('click', ()=>crearSplitRow());
+document.getElementById('g_dividir').addEventListener('change', (e)=>{
+  const container = document.getElementById('g_splits_container');
+  const cursoWrap = document.getElementById('g_curso_wrap');
+  const montoInput = document.getElementById('g_monto');
+  const lockHint = document.getElementById('g_monto_lock_hint');
+  if(e.target.checked){
+    container.style.display='block';
+    cursoWrap.style.display='none';
+    montoInput.readOnly = true;
+    lockHint.style.display='inline';
+    if(document.getElementById('g_splits_rows').children.length===0){
+      crearSplitRow(); crearSplitRow();
+    }
+    recalcSplitTotal();
+  }else{
+    container.style.display='none';
+    cursoWrap.style.display='block';
+    montoInput.readOnly = false;
+    lockHint.style.display='none';
+    document.getElementById('g_splits_rows').innerHTML='';
+  }
+});
+function limpiarFormularioGasto(){
+  document.getElementById('g_curso').value='';
+  document.getElementById('g_descripcion').value='';
+  document.getElementById('g_monto').value='';
+  document.getElementById('g_dividir').checked=false;
+  document.getElementById('g_splits_container').style.display='none';
+  document.getElementById('g_curso_wrap').style.display='block';
+  document.getElementById('g_monto').readOnly=false;
+  document.getElementById('g_monto_lock_hint').style.display='none';
+  document.getElementById('g_splits_rows').innerHTML='';
+  editingGastoId=null; dividiendoGastoId=null;
+  document.getElementById('g_panel_titulo').textContent='Registrar Gasto';
+  document.getElementById('g_edit_hint').style.display='none';
+  document.getElementById('btn_guardar_gasto').textContent='Guardar Gasto';
+  document.getElementById('btn_cancelar_gasto').style.display='none';
+}
+window.editarGasto = function(id){
+  const g = GASTOS.find(x=>x.id===id);
+  if(!g) return;
+  limpiarFormularioGasto();
+  editingGastoId = id;
+  document.getElementById('g_fecha').value = (g.fecha||'').slice(0,10);
+  document.getElementById('g_categoria').value = g.categoria;
+  document.getElementById('g_banco').value = g.banco;
+  document.getElementById('g_curso').value = g.curso||'';
+  document.getElementById('g_descripcion').value = g.descripcion||'';
+  document.getElementById('g_monto').value = g.monto;
+  document.getElementById('g_panel_titulo').textContent='Editar Gasto';
+  document.getElementById('g_edit_hint').style.display='block';
+  document.getElementById('g_edit_hint').textContent='Editando un gasto existente. Guarda para aplicar los cambios.';
+  document.getElementById('btn_guardar_gasto').textContent='Actualizar Gasto';
+  document.getElementById('btn_cancelar_gasto').style.display='inline-block';
+  document.getElementById('tab-gastos').scrollIntoView({behavior:'smooth'});
+};
+window.dividirGasto = function(id){
+  const g = GASTOS.find(x=>x.id===id);
+  if(!g) return;
+  limpiarFormularioGasto();
+  dividiendoGastoId = id;
+  document.getElementById('g_fecha').value = (g.fecha||'').slice(0,10);
+  document.getElementById('g_categoria').value = g.categoria;
+  document.getElementById('g_banco').value = g.banco;
+  document.getElementById('g_descripcion').value = g.descripcion||'';
+  document.getElementById('g_dividir').checked = true;
+  document.getElementById('g_splits_container').style.display='block';
+  document.getElementById('g_curso_wrap').style.display='none';
+  document.getElementById('g_monto').readOnly = true;
+  document.getElementById('g_monto_lock_hint').style.display='inline';
+  document.getElementById('g_splits_rows').innerHTML='';
+  crearSplitRow(g.curso||'', g.monto);
+  crearSplitRow('', '');
+  recalcSplitTotal();
+  document.getElementById('g_panel_titulo').textContent='Dividir Gasto entre Cursos';
+  document.getElementById('g_edit_hint').style.display='block';
+  document.getElementById('g_edit_hint').textContent=`Este gasto de ${fmt(g.monto)} se eliminará y se reemplazará por las líneas divididas que definas abajo.`;
+  document.getElementById('btn_guardar_gasto').textContent='Guardar División';
+  document.getElementById('btn_cancelar_gasto').style.display='inline-block';
+  document.getElementById('tab-gastos').scrollIntoView({behavior:'smooth'});
+};
+document.getElementById('btn_cancelar_gasto').addEventListener('click', limpiarFormularioGasto);
 document.getElementById('btn_guardar_gasto').addEventListener('click', async ()=>{
   const fecha=document.getElementById('g_fecha').value||new Date().toISOString().slice(0,10);
   const categoria=document.getElementById('g_categoria').value;
   const banco=document.getElementById('g_banco').value;
-  const curso=document.getElementById('g_curso').value.trim();
   const descripcion=document.getElementById('g_descripcion').value.trim();
-  const monto=Number(document.getElementById('g_monto').value)||0;
-  if(monto<=0){ showToast('El monto debe ser mayor a 0.'); return; }
+  const dividiendo=document.getElementById('g_dividir').checked;
   try{
-    await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso, descripcion, monto}});
-    document.getElementById('g_curso').value=''; document.getElementById('g_descripcion').value=''; document.getElementById('g_monto').value='';
-    showToast('Gasto guardado.');
+    if(dividiendo){
+      const splits=[...document.getElementById('g_splits_rows').children].map(row=>({
+        curso: row.querySelector('.split-curso').value.trim(),
+        monto: Number(row.querySelector('.split-monto').value)||0
+      })).filter(s=>s.curso && s.monto>0);
+      if(splits.length<2){ showToast('Agrega al menos 2 cursos con monto para dividir.'); return; }
+      if(dividiendoGastoId){ await apiPost('Gastos','delete',{id:dividiendoGastoId}); }
+      for(const s of splits){
+        await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso:s.curso, descripcion: descripcion ? `${descripcion} (dividido)` : '(dividido)', monto:s.monto}});
+      }
+      showToast('Gasto dividido y guardado.');
+    }else{
+      const curso=document.getElementById('g_curso').value.trim();
+      const monto=Number(document.getElementById('g_monto').value)||0;
+      if(monto<=0){ showToast('El monto debe ser mayor a 0.'); return; }
+      if(editingGastoId){
+        await apiPost('Gastos','update',{id:editingGastoId, data:{fecha, categoria, banco, curso, descripcion, monto}});
+        showToast('Gasto actualizado.');
+      }else{
+        await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso, descripcion, monto}});
+        showToast('Gasto guardado.');
+      }
+    }
+    limpiarFormularioGasto();
     await loadAll();
   }catch(e){ showToast('Error al guardar: '+e.message); }
 });
-
 function renderTablaGastos(){
   const mes=document.getElementById('filt_g_mes').value, cat=document.getElementById('filt_g_categoria').value;
   let rows=GASTOS.slice();
@@ -580,7 +681,11 @@ function renderTablaGastos(){
   if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; }
   else{
     empty.style.display='none';
-    body.innerHTML = rows.map(g=>`<tr><td>${fechaCorta(g.fecha)}</td><td>${g.categoria}</td><td>${g.curso||'—'}</td><td>${g.descripcion}</td><td>${g.banco}</td><td class="num">${fmt(g.monto)}</td><td><button class="btn btn-ghost btn-sm" onclick="eliminarGasto('${g.id}')">Eliminar</button></td></tr>`).join('');
+    body.innerHTML = rows.map(g=>`<tr><td>${fechaCorta(g.fecha)}</td><td>${g.categoria}</td><td>${g.curso||'—'}</td><td>${g.descripcion}</td><td>${g.banco}</td><td class="num">${fmt(g.monto)}</td><td style="white-space:nowrap;">
+      <button class="btn btn-ghost btn-sm" onclick="editarGasto('${g.id}')">Editar</button>
+      <button class="btn btn-ghost btn-sm" onclick="dividirGasto('${g.id}')">Dividir</button>
+      <button class="btn btn-ghost btn-sm" onclick="eliminarGasto('${g.id}')">Eliminar</button>
+    </td></tr>`).join('');
   }
   document.getElementById('tot_gastos_tab').textContent = fmt(rows.reduce((s,g)=>s+g.monto,0));
 }
@@ -591,10 +696,8 @@ window.eliminarGasto = async function(id){
   await loadAll();
 };
 document.getElementById('btn_filtrar_gastos').addEventListener('click', renderTablaGastos);
-
 function deudaCuotasRestantes(d){ return Math.max(0,(d.cuotasTotal||0)-(d.cuotasPagadas||0)); }
 function deudaSaldoPendiente(d){ return deudaCuotasRestantes(d)*(d.valorCuota||0); }
-
 document.getElementById('btn_guardar_deuda').addEventListener('click', async ()=>{
   const banco=document.getElementById('d_banco').value;
   const tipo=document.getElementById('d_tipo').value;
@@ -612,7 +715,6 @@ document.getElementById('btn_guardar_deuda').addEventListener('click', async ()=
     await loadAll();
   }catch(e){ showToast('Error al guardar: '+e.message); }
 });
-
 function renderTablaDeudas(){
   const body=document.getElementById('tabla_deudas'), empty=document.getElementById('deudas_empty');
   if(DEUDAS.length===0){ body.innerHTML=''; empty.style.display='block'; document.getElementById('tot_deuda').textContent=fmt(0); return; }
@@ -645,7 +747,6 @@ window.eliminarDeuda = async function(id){
   showToast('Deuda eliminada.');
   await loadAll();
 };
-
 document.getElementById('btn_guardar_capital').addEventListener('click', async ()=>{
   const fecha=document.getElementById('c_fecha').value||new Date().toISOString().slice(0,10);
   const monto=Number(document.getElementById('c_monto').value)||0;
@@ -658,7 +759,6 @@ document.getElementById('btn_guardar_capital').addEventListener('click', async (
     await loadAll();
   }catch(e){ showToast('Error al guardar: '+e.message); }
 });
-
 function renderTablaCapital(){
   const body=document.getElementById('tabla_capital'), empty=document.getElementById('capital_empty');
   if(CAPITAL.length===0){ body.innerHTML=''; empty.style.display='block'; }
@@ -674,17 +774,14 @@ window.eliminarCapital = async function(id){
   showToast('Aporte eliminado.');
   await loadAll();
 };
-
 function renderComisiones(){
   const cursos = [...new Set(ingresosActivos().map(i=>i.curso).filter(Boolean))].sort();
   const contBox = document.getElementById('comisiones_content');
   if(!contBox) return;
   if(cursos.length===0){ contBox.innerHTML = '<div class="panel"><p class="hint" style="margin:0;">Aún no hay ventas registradas.</p></div>'; return; }
-
   const totalPorVendedor = {};
   let totalKinller = 0;
   let totalComisionesGeneral = 0;
-
   const bloquesHtml = cursos.map(curso=>{
     const ventasCurso = ingresosActivos().filter(i=>i.curso===curso).slice().sort((a,b)=>b.monto-a.monto);
     const totalVentasCurso = ventasCurso.reduce((s,v)=>s+v.monto,0);
@@ -692,7 +789,6 @@ function renderComisiones(){
     const utilidadCurso = totalVentasCurso - gastosCurso;
     const comisionKinller = utilidadCurso>0 ? utilidadCurso*0.05 : 0;
     totalKinller += comisionKinller;
-
     const filasHtml = ventasCurso.map((v,i)=>{
       const esCeprocenter = i<5;
       let comision = 0;
@@ -710,7 +806,6 @@ function renderComisiones(){
         <td class="num">${esCeprocenter ? '—' : fmt(comision)}</td>
       </tr>`;
     }).join('');
-
     return `
       <div class="panel">
         <h2>${curso}</h2>
@@ -722,10 +817,8 @@ function renderComisiones(){
       </div>
     `;
   }).join('');
-
   const resumenVendedores = Object.entries(totalPorVendedor).sort((a,b)=>b[1]-a[1])
     .map(([v,m])=>`<tr><td>${v}</td><td class="num">${fmt(m)}</td></tr>`).join('') || '<tr><td colspan="2" style="text-align:center;color:var(--text-dim);">Sin comisiones generadas aún (aún no hay más de 5 ventas en ningún curso).</td></tr>';
-
   contBox.innerHTML = `
     <div class="panel">
       <h2>Resumen de Comisiones</h2>
@@ -742,10 +835,8 @@ function renderComisiones(){
     ${bloquesHtml}
   `;
 }
-
 document.getElementById('btn_todo_periodo').addEventListener('click', ()=>{ document.getElementById('rep_mes').value=''; generarReporte(); });
 document.getElementById('btn_generar_reporte').addEventListener('click', generarReporte);
-
 function generarReporte(){
   const mes=document.getElementById('rep_mes').value;
   const filtroLabel = mes ? new Date(mes+'-01').toLocaleDateString('es-EC',{month:'long',year:'numeric'}) : 'Histórico completo';
@@ -763,25 +854,19 @@ function generarReporte(){
   let txt = `REPORTE FINANCIERO — CEPROCENTER
 Periodo: ${filtroLabel}
 Generado: ${new Date().toLocaleDateString('es-EC')}
-
 RESUMEN EJECUTIVO
 Ventas totales: ${fmt(totalVentas)}
 Gastos totales: ${fmt(totalGastosOp)}
 Utilidad neta del periodo: ${fmt(utilidadNeta)}
-
 Capital total aportado: ${fmt(totalCapital)}
 Deuda pendiente: ${fmt(totalDeuda)}
 Ventas sin confirmar en banco: ${pendientesConfirmar}
-
 VENTAS POR CONCEPTO
 ${Object.entries(porConcepto).map(([k,v])=>`  ${k}: ${fmt(v)}`).join('\n')||'  Sin datos'}
-
 TOP 5 CURSOS
 ${topCursos.map(([k,v],idx)=>`  ${idx+1}. ${k}: ${fmt(v)}`).join('\n')||'  Sin datos'}
-
 GASTOS POR CATEGORÍA
 ${Object.entries(porCategoriaGasto).map(([k,v])=>`  ${k}: ${fmt(v)}`).join('\n')||'  Sin datos'}
-
 DEUDAS ACTIVAS
 ${DEUDAS.filter(d=>deudaCuotasRestantes(d)>0).map(d=>`  ${d.banco} — ${d.descripcion}: ${d.cuotasPagadas}/${d.cuotasTotal} cuotas, restante ${fmt(deudaSaldoPendiente(d))}`).join('\n')||'  Sin deudas activas'}`;
   const box=document.getElementById('reporte_box');
@@ -793,7 +878,6 @@ document.getElementById('btn_copiar_reporte').addEventListener('click', async ()
   catch(e){ showToast('No se pudo copiar.'); }
 });
 document.getElementById('btn_imprimir_reporte').addEventListener('click', ()=>window.print());
-
 document.querySelectorAll('.tab').forEach(tab=>{
   tab.addEventListener('click', ()=>{
     document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -803,7 +887,6 @@ document.querySelectorAll('.tab').forEach(tab=>{
     });
   });
 });
-
 ['i_fecha','g_fecha','c_fecha','d_fecha_inicio'].forEach(id=>document.getElementById(id).valueAsDate = new Date());
 initApp();
 </script>
