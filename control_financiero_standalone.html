@@ -34,9 +34,10 @@
   .tick .n{font-family:'Quicksand',sans-serif;font-size:23px;font-weight:700;color:var(--accent);}
   .tick .n.neg{color:var(--danger);} .tick .n.warn{color:var(--warn);}
   .tick .l{font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-dim);margin-top:2px;}
-  .tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .tabs{display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:6px 14px 0;box-shadow:0 1px 2px rgba(36,39,58,0.04);}
   .tab{background:none;border:none;color:var(--text-dim);font-family:'Quicksand',sans-serif;font-size:15.5px;font-weight:600;padding:10px 6px;cursor:pointer;border-bottom:2px solid transparent;margin-right:22px;}
   .tab.active{color:var(--text);border-bottom-color:var(--accent);}
+  .tab:hover{color:var(--accent);}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:18px;box-shadow:0 1px 2px rgba(36,39,58,0.03);}
   .panel h2{font-size:19px;margin:0 0 4px;color:var(--text);}
   .panel .hint{color:var(--text-dim);font-size:12.5px;margin:0 0 18px;}
@@ -151,6 +152,7 @@
             <option>Inscripción</option><option>Masterclass</option><option>Diplomado</option><option>Entrenamiento</option><option>Seminario</option>
           </select></div>
           <div class="field"><label>Curso / Programa</label><select id="i_curso" class="select-curso"></select></div>
+          <div class="field"><label>Módulo</label><select id="i_modulo" class="select-modulo"></select></div>
           <div class="field"><label>Estudiante / Detalle</label><input id="i_concepto" placeholder="Nombre o detalle"></div>
           <div class="field"><label>Vendido por</label><select id="i_asesor"><option>Jose</option><option>Sara</option><option>Directo</option></select></div>
           <div class="field"><label>Cuenta Bancaria</label><select id="i_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Zelle</option><option>PayPal</option><option>Pago Móvil</option><option>Otro</option></select></div>
@@ -207,19 +209,20 @@
           </select></div>
           <div class="field"><label>Cuenta Bancaria</label><select id="g_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Zelle</option><option>PayPal</option><option>Pago Móvil</option><option>Otro</option></select></div>
           <div class="field" id="g_curso_wrap"><label>Curso (opcional, para calcular comisiones)</label><select id="g_curso" class="select-curso"></select></div>
+          <div class="field" id="g_modulo_wrap"><label>Módulo (opcional, para calcular comisiones por módulo)</label><select id="g_modulo" class="select-modulo"></select></div>
           <div class="field"><label>Descripción</label><input id="g_descripcion" placeholder="Detalle del gasto"></div>
           <div class="field"><label>Monto ($) <span id="g_monto_lock_hint" style="display:none;font-weight:400;text-transform:none;color:var(--text-dim);">(suma automática)</span></label><input id="g_monto" type="number" step="0.01" placeholder="0.00"></div>
           <div class="field" style="display:flex;align-items:flex-end;">
             <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer;">
               <input type="checkbox" id="g_dividir" style="width:18px;height:18px;">
-              Dividir este gasto entre varios cursos
+              Dividir este gasto entre varios cursos/módulos
             </label>
           </div>
         </div>
         <div id="g_splits_container" style="display:none;margin-top:14px;">
-          <p class="hint" style="margin:0 0 8px;">Indica cuánto de este gasto corresponde a cada curso. La suma se convierte en el monto total del gasto.</p>
+          <p class="hint" style="margin:0 0 8px;">Indica cuánto de este gasto corresponde a cada curso/módulo. La suma se convierte en el monto total del gasto.</p>
           <div id="g_splits_rows"></div>
-          <button class="btn btn-ghost btn-sm" id="btn_add_split" type="button">+ Agregar curso</button>
+          <button class="btn btn-ghost btn-sm" id="btn_add_split" type="button">+ Agregar línea</button>
           <div class="hint" id="g_splits_total" style="margin-top:8px;"></div>
         </div>
         <div class="actions">
@@ -235,9 +238,9 @@
           <button class="btn btn-ghost btn-sm" id="btn_filtrar_gastos">Aplicar</button>
         </div>
         <div class="table-scroll"><table>
-          <thead><tr><th>Fecha</th><th>Categoría</th><th>Curso</th><th>Descripción</th><th>Cuenta</th><th class="num">Monto</th><th></th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Categoría</th><th>Curso</th><th>Módulo</th><th>Descripción</th><th>Cuenta</th><th class="num">Monto</th><th></th></tr></thead>
           <tbody id="tabla_gastos"></tbody>
-          <tfoot><tr><td colspan="5">TOTAL</td><td class="num" id="tot_gastos_tab">$0.00</td><td></td></tr></tfoot>
+          <tfoot><tr><td colspan="6">TOTAL</td><td class="num" id="tot_gastos_tab">$0.00</td><td></td></tr></tfoot>
         </table></div>
         <div class="empty" id="gastos_empty" style="display:none;">No hay gastos con este filtro.</div>
       </div>
@@ -337,15 +340,78 @@ function poblarSelectsCurso(){
     sel.innerHTML = cursoOptionsHtml(val);
   });
 }
+let MODULOS = JSON.parse(localStorage.getItem('cepro_modulos')||'{}');
+function guardarModulos(){ localStorage.setItem('cepro_modulos', JSON.stringify(MODULOS)); }
+function agregarModuloSiNoExiste(curso, modulo){
+  if(!curso || !modulo) return;
+  if(!MODULOS[curso]) MODULOS[curso]=[];
+  const existe = MODULOS[curso].some(m=>normalizarBusqueda(m)===normalizarBusqueda(modulo));
+  if(!existe){ MODULOS[curso].push(modulo); guardarModulos(); }
+}
+function sincronizarModulosDesdeDatos(){
+  [...INGRESOS, ...GASTOS].forEach(x=>{ if(x.curso && x.modulo) agregarModuloSiNoExiste(x.curso, x.modulo); });
+}
+function moduloOptionsHtml(curso, seleccionado){
+  const mods = (MODULOS[curso]||[]).slice().sort((a,b)=>a.localeCompare(b,'es'));
+  let html = `<option value="">— Selecciona un módulo —</option>`;
+  html += mods.map(m=>`<option value="${m.replace(/"/g,'&quot;')}" ${m===seleccionado?'selected':''}>${m}</option>`).join('');
+  html += `<option value="__nuevo__">+ Agregar nuevo módulo...</option>`;
+  return html;
+}
+function poblarSelectModulo(selectModuloEl, curso, seleccionado){
+  if(!selectModuloEl) return;
+  selectModuloEl.innerHTML = moduloOptionsHtml(curso||'', seleccionado!==undefined?seleccionado:selectModuloEl.value);
+}
+function cursoSelectDeModulo(moduloSel){
+  if(moduloSel.id==='i_modulo') return document.getElementById('i_curso');
+  if(moduloSel.id==='g_modulo') return document.getElementById('g_curso');
+  if(moduloSel.classList.contains('split-modulo')){
+    const fila = moduloSel.closest('.split-row');
+    return fila ? fila.querySelector('.split-curso') : null;
+  }
+  return null;
+}
+function moduloSelectDeCurso(cursoSel){
+  if(cursoSel.id==='i_curso') return document.getElementById('i_modulo');
+  if(cursoSel.id==='g_curso') return document.getElementById('g_modulo');
+  if(cursoSel.classList.contains('split-curso')){
+    const fila = cursoSel.closest('.split-row');
+    return fila ? fila.querySelector('.split-modulo') : null;
+  }
+  return null;
+}
 document.addEventListener('change', (e)=>{
-  if(e.target.classList && e.target.classList.contains('select-curso') && e.target.value==='__nuevo__'){
-    const nombre = prompt('Escribe el nombre EXACTO del nuevo curso (así se usará siempre, cuida mayúsculas y tildes):');
-    if(nombre && nombre.trim()){
-      agregarCursoSiNoExiste(nombre.trim());
-      poblarSelectsCurso();
-      e.target.value = nombre.trim();
-    }else{
-      e.target.value = '';
+  if(!e.target.classList) return;
+  if(e.target.classList.contains('select-curso')){
+    if(e.target.value==='__nuevo__'){
+      const nombre = prompt('Escribe el nombre EXACTO del nuevo curso (así se usará siempre, cuida mayúsculas y tildes):');
+      if(nombre && nombre.trim()){
+        agregarCursoSiNoExiste(nombre.trim());
+        poblarSelectsCurso();
+        e.target.value = nombre.trim();
+      }else{
+        e.target.value = '';
+      }
+    }
+    const moduloSel = moduloSelectDeCurso(e.target);
+    if(moduloSel) poblarSelectModulo(moduloSel, e.target.value, '');
+  }
+  if(e.target.classList.contains('select-modulo')){
+    if(e.target.value==='__nuevo__'){
+      const cursoSel = cursoSelectDeModulo(e.target);
+      const cursoVal = cursoSel ? cursoSel.value : '';
+      if(!cursoVal || cursoVal==='__nuevo__'){
+        showToast('Primero selecciona un curso.');
+        e.target.value='';
+      }else{
+        const nombre = prompt(`Escribe el nombre EXACTO del nuevo módulo para "${cursoVal}":`);
+        if(nombre && nombre.trim()){
+          agregarModuloSiNoExiste(cursoVal, nombre.trim());
+          poblarSelectModulo(e.target, cursoVal, nombre.trim());
+        }else{
+          e.target.value='';
+        }
+      }
     }
   }
 });
@@ -390,7 +456,12 @@ async function loadAll(){
   DEUDAS = deu.map(d=>({...d, montoTotal:normNum(d.montoTotal), cuotasTotal:normNum(d.cuotasTotal), valorCuota:normNum(d.valorCuota), cuotasPagadas:normNum(d.cuotasPagadas)}));
   CAPITAL = cap.map(c=>({...c, monto:normNum(c.monto)}));
   sincronizarCursosDesdeDatos();
+  sincronizarModulosDesdeDatos();
   poblarSelectsCurso();
+  document.querySelectorAll('.select-modulo').forEach(sel=>{
+    const cursoSel = cursoSelectDeModulo(sel);
+    if(cursoSel) poblarSelectModulo(sel, cursoSel.value, sel.value);
+  });
   renderAll();
 }
 async function initApp(){
@@ -482,6 +553,7 @@ document.getElementById('btn_guardar_ingreso').addEventListener('click', async (
   const fecha=document.getElementById('i_fecha').value||new Date().toISOString().slice(0,10);
   const tipo=document.getElementById('i_tipo').value;
   const curso=document.getElementById('i_curso').value.trim();
+  const modulo=document.getElementById('i_modulo').value.trim();
   const concepto=document.getElementById('i_concepto').value.trim();
   const asesor=document.getElementById('i_asesor').value;
   const banco=document.getElementById('i_banco').value;
@@ -492,8 +564,8 @@ document.getElementById('btn_guardar_ingreso').addEventListener('click', async (
   if(!curso){ showToast('Falta el curso.'); return; }
   if(monto<=0){ showToast('El monto debe ser mayor a 0.'); return; }
   try{
-    await apiPost('Ventas','add',{data:{id:uid(), fecha, tipo, curso, concepto, asesor, banco, metodoPago, monto, confirmado, esHistorica}});
-    document.getElementById('i_curso').value=''; document.getElementById('i_concepto').value=''; document.getElementById('i_monto').value=''; document.getElementById('i_historica').checked=false;
+    await apiPost('Ventas','add',{data:{id:uid(), fecha, tipo, curso, modulo, concepto, asesor, banco, metodoPago, monto, confirmado, esHistorica}});
+    document.getElementById('i_curso').value=''; poblarSelectModulo(document.getElementById('i_modulo'), '', ''); document.getElementById('i_concepto').value=''; document.getElementById('i_monto').value=''; document.getElementById('i_historica').checked=false;
     showToast('Venta guardada.');
     await loadAll();
   }catch(e){ showToast('Error al guardar: '+e.message); }
@@ -556,7 +628,7 @@ function renderTablaIngresos(){
       <td class="sticky-col sticky-1">${fechaCorta(i.fecha)}</td>
       <td class="sticky-col sticky-2">${i.concepto}</td>
       <td class="sticky-col sticky-3">${i.confirmado?'<span class="pill ok">Confirmado</span>':'<button class="btn btn-ghost btn-sm" onclick="confirmarIngreso(\''+i.id+'\')">Marcar</button>'}</td>
-      <td title="${(i.tipo||'').replace(/"/g,'&quot;')}">${acortarModulo(i.tipo)}${i.esHistorica?' <span class="pill na">Histórica</span>':''}</td>
+      <td>${i.modulo||'—'}${i.esHistorica?' <span class="pill na">Histórica</span>':''}</td>
       <td>${i.curso}</td><td>${i.asesor}</td><td>${i.metodoPago||'—'}</td><td>${i.banco}</td>
       <td class="num">${fmt(i.monto)}</td>
       <td><button class="btn btn-ghost btn-sm" onclick="eliminarIngreso('${i.id}')">Eliminar</button></td>
@@ -574,14 +646,16 @@ document.getElementById('btn_filtrar_ingresos').addEventListener('click', render
 document.getElementById('filt_i_estudiante').addEventListener('input', renderTablaIngresos);
 let editingGastoId = null;
 let dividiendoGastoId = null;
-function crearSplitRow(curso='', monto=''){
+function crearSplitRow(curso='', modulo='', monto=''){
   const row = document.createElement('div');
+  row.className = 'split-row';
   row.style.display = 'grid';
-  row.style.gridTemplateColumns = '1fr 160px 40px';
+  row.style.gridTemplateColumns = '1fr 1fr 140px 40px';
   row.style.gap = '10px';
   row.style.marginBottom = '8px';
   row.innerHTML = `
     <div class="field" style="margin-bottom:0;"><select class="split-curso select-curso">${cursoOptionsHtml(curso)}</select></div>
+    <div class="field" style="margin-bottom:0;"><select class="split-modulo select-modulo">${moduloOptionsHtml(curso, modulo)}</select></div>
     <div class="field" style="margin-bottom:0;"><input class="split-monto" type="number" step="0.01" placeholder="0.00" value="${monto}"></div>
     <button class="btn btn-ghost btn-sm" type="button" onclick="this.parentElement.remove(); recalcSplitTotal();">✕</button>
   `;
@@ -598,11 +672,13 @@ document.getElementById('btn_add_split').addEventListener('click', ()=>crearSpli
 document.getElementById('g_dividir').addEventListener('change', (e)=>{
   const container = document.getElementById('g_splits_container');
   const cursoWrap = document.getElementById('g_curso_wrap');
+  const moduloWrap = document.getElementById('g_modulo_wrap');
   const montoInput = document.getElementById('g_monto');
   const lockHint = document.getElementById('g_monto_lock_hint');
   if(e.target.checked){
     container.style.display='block';
     cursoWrap.style.display='none';
+    moduloWrap.style.display='none';
     montoInput.readOnly = true;
     lockHint.style.display='inline';
     if(document.getElementById('g_splits_rows').children.length===0){
@@ -612,6 +688,7 @@ document.getElementById('g_dividir').addEventListener('change', (e)=>{
   }else{
     container.style.display='none';
     cursoWrap.style.display='block';
+    moduloWrap.style.display='block';
     montoInput.readOnly = false;
     lockHint.style.display='none';
     document.getElementById('g_splits_rows').innerHTML='';
@@ -619,11 +696,13 @@ document.getElementById('g_dividir').addEventListener('change', (e)=>{
 });
 function limpiarFormularioGasto(){
   document.getElementById('g_curso').value='';
+  poblarSelectModulo(document.getElementById('g_modulo'), '', '');
   document.getElementById('g_descripcion').value='';
   document.getElementById('g_monto').value='';
   document.getElementById('g_dividir').checked=false;
   document.getElementById('g_splits_container').style.display='none';
   document.getElementById('g_curso_wrap').style.display='block';
+  document.getElementById('g_modulo_wrap').style.display='block';
   document.getElementById('g_monto').readOnly=false;
   document.getElementById('g_monto_lock_hint').style.display='none';
   document.getElementById('g_splits_rows').innerHTML='';
@@ -642,6 +721,7 @@ window.editarGasto = function(id){
   document.getElementById('g_categoria').value = g.categoria;
   document.getElementById('g_banco').value = g.banco;
   document.getElementById('g_curso').value = g.curso||'';
+  poblarSelectModulo(document.getElementById('g_modulo'), g.curso||'', g.modulo||'');
   document.getElementById('g_descripcion').value = g.descripcion||'';
   document.getElementById('g_monto').value = g.monto;
   document.getElementById('g_panel_titulo').textContent='Editar Gasto';
@@ -663,13 +743,14 @@ window.dividirGasto = function(id){
   document.getElementById('g_dividir').checked = true;
   document.getElementById('g_splits_container').style.display='block';
   document.getElementById('g_curso_wrap').style.display='none';
+  document.getElementById('g_modulo_wrap').style.display='none';
   document.getElementById('g_monto').readOnly = true;
   document.getElementById('g_monto_lock_hint').style.display='inline';
   document.getElementById('g_splits_rows').innerHTML='';
-  crearSplitRow(g.curso||'', g.monto);
-  crearSplitRow('', '');
+  crearSplitRow(g.curso||'', g.modulo||'', g.monto);
+  crearSplitRow('', '', '');
   recalcSplitTotal();
-  document.getElementById('g_panel_titulo').textContent='Dividir Gasto entre Cursos';
+  document.getElementById('g_panel_titulo').textContent='Dividir Gasto entre Cursos/Módulos';
   document.getElementById('g_edit_hint').style.display='block';
   document.getElementById('g_edit_hint').textContent=`Este gasto de ${fmt(g.monto)} se eliminará y se reemplazará por las líneas divididas que definas abajo.`;
   document.getElementById('btn_guardar_gasto').textContent='Guardar División';
@@ -687,23 +768,25 @@ document.getElementById('btn_guardar_gasto').addEventListener('click', async ()=
     if(dividiendo){
       const splits=[...document.getElementById('g_splits_rows').children].map(row=>({
         curso: row.querySelector('.split-curso').value.trim(),
+        modulo: row.querySelector('.split-modulo').value.trim(),
         monto: Number(row.querySelector('.split-monto').value)||0
       })).filter(s=>s.curso && s.monto>0);
-      if(splits.length<2){ showToast('Agrega al menos 2 cursos con monto para dividir.'); return; }
+      if(splits.length<2){ showToast('Agrega al menos 2 líneas con curso y monto para dividir.'); return; }
       if(dividiendoGastoId){ await apiPost('Gastos','delete',{id:dividiendoGastoId}); }
       for(const s of splits){
-        await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso:s.curso, descripcion: descripcion ? `${descripcion} (dividido)` : '(dividido)', monto:s.monto}});
+        await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso:s.curso, modulo:s.modulo, descripcion: descripcion ? `${descripcion} (dividido)` : '(dividido)', monto:s.monto}});
       }
       showToast('Gasto dividido y guardado.');
     }else{
       const curso=document.getElementById('g_curso').value.trim();
+      const modulo=document.getElementById('g_modulo').value.trim();
       const monto=Number(document.getElementById('g_monto').value)||0;
       if(monto<=0){ showToast('El monto debe ser mayor a 0.'); return; }
       if(editingGastoId){
-        await apiPost('Gastos','update',{id:editingGastoId, data:{fecha, categoria, banco, curso, descripcion, monto}});
+        await apiPost('Gastos','update',{id:editingGastoId, data:{fecha, categoria, banco, curso, modulo, descripcion, monto}});
         showToast('Gasto actualizado.');
       }else{
-        await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso, descripcion, monto}});
+        await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso, modulo, descripcion, monto}});
         showToast('Gasto guardado.');
       }
     }
@@ -721,7 +804,7 @@ function renderTablaGastos(){
   if(rows.length===0){ body.innerHTML=''; empty.style.display='block'; }
   else{
     empty.style.display='none';
-    body.innerHTML = rows.map(g=>`<tr><td>${fechaCorta(g.fecha)}</td><td>${g.categoria}</td><td>${g.curso||'—'}</td><td>${g.descripcion}</td><td>${g.banco}</td><td class="num">${fmt(g.monto)}</td><td style="white-space:nowrap;">
+    body.innerHTML = rows.map(g=>`<tr><td>${fechaCorta(g.fecha)}</td><td>${g.categoria}</td><td>${g.curso||'—'}</td><td>${g.modulo||'—'}</td><td>${g.descripcion}</td><td>${g.banco}</td><td class="num">${fmt(g.monto)}</td><td style="white-space:nowrap;">
       <button class="btn btn-ghost btn-sm" onclick="editarGasto('${g.id}')">Editar</button>
       <button class="btn btn-ghost btn-sm" onclick="dividirGasto('${g.id}')">Dividir</button>
       <button class="btn btn-ghost btn-sm" onclick="eliminarGasto('${g.id}')">Eliminar</button>
@@ -822,47 +905,75 @@ function renderComisiones(){
   const totalPorVendedor = {};
   let totalKinller = 0;
   let totalComisionesGeneral = 0;
+  const SIN_MODULO = '(Sin módulo)';
   const bloquesHtml = cursos.map(curso=>{
-    const ventasCurso = ingresosActivos().filter(i=>i.curso===curso).slice().sort((a,b)=>b.monto-a.monto);
-    const totalVentasCurso = ventasCurso.reduce((s,v)=>s+v.monto,0);
-    const gastosCurso = GASTOS.filter(g=>g.curso===curso).reduce((s,g)=>s+g.monto,0);
-    const utilidadCurso = totalVentasCurso - gastosCurso;
-    const comisionKinller = utilidadCurso>0 ? utilidadCurso*0.05 : 0;
-    totalKinller += comisionKinller;
-    const filasHtml = ventasCurso.map((v,i)=>{
-      const esCeprocenter = i<5;
-      let comision = 0;
-      if(!esCeprocenter && utilidadCurso>0 && totalVentasCurso>0){
-        comision = 0.03 * (v.monto/totalVentasCurso) * utilidadCurso;
-        totalPorVendedor[v.asesor] = (totalPorVendedor[v.asesor]||0) + comision;
-        totalComisionesGeneral += comision;
-      }
-      return `<tr>
-        <td>${i+1}</td>
-        <td>${v.concepto}</td>
-        <td>${v.asesor}</td>
-        <td class="num">${fmt(v.monto)}</td>
-        <td>${esCeprocenter ? '<span class="pill na">Para Ceprocenter</span>' : '<span class="pill ok">Con comisión</span>'}</td>
-        <td class="num">${esCeprocenter ? '—' : fmt(comision)}</td>
-      </tr>`;
+    const ventasCursoTodas = ingresosActivos().filter(i=>i.curso===curso);
+    const totalVentasCurso = ventasCursoTodas.reduce((s,v)=>s+v.monto,0);
+    const totalGastosCurso = GASTOS.filter(g=>g.curso===curso).reduce((s,g)=>s+g.monto,0);
+    const totalUtilidadCurso = totalVentasCurso - totalGastosCurso;
+    const modulos = [...new Set(ventasCursoTodas.map(v=>v.modulo||SIN_MODULO))].sort((a,b)=>{
+      if(a===SIN_MODULO) return 1;
+      if(b===SIN_MODULO) return -1;
+      return a.localeCompare(b,'es');
+    });
+    const totalPorVendedorCurso = {};
+    const modulosHtml = modulos.map(modulo=>{
+      const ventasModulo = ventasCursoTodas.filter(v=>(v.modulo||SIN_MODULO)===modulo).slice().sort((a,b)=>b.monto-a.monto);
+      const totalVentasModulo = ventasModulo.reduce((s,v)=>s+v.monto,0);
+      const gastosModulo = GASTOS.filter(g=>g.curso===curso && (g.modulo||SIN_MODULO)===modulo).reduce((s,g)=>s+g.monto,0);
+      const utilidadModulo = totalVentasModulo - gastosModulo;
+      const comisionKinllerModulo = utilidadModulo>0 ? utilidadModulo*0.05 : 0;
+      totalKinller += comisionKinllerModulo;
+      const filasHtml = ventasModulo.map((v,i)=>{
+        const esCeprocenter = i<5;
+        let comision = 0;
+        if(!esCeprocenter && utilidadModulo>0 && totalVentasModulo>0){
+          comision = 0.03 * (v.monto/totalVentasModulo) * utilidadModulo;
+          totalPorVendedor[v.asesor] = (totalPorVendedor[v.asesor]||0) + comision;
+          totalPorVendedorCurso[v.asesor] = (totalPorVendedorCurso[v.asesor]||0) + comision;
+          totalComisionesGeneral += comision;
+        }
+        return `<tr>
+          <td>${i+1}</td>
+          <td>${v.concepto}</td>
+          <td>${v.asesor}</td>
+          <td class="num">${fmt(v.monto)}</td>
+          <td>${esCeprocenter ? '<span class="pill na">Para Ceprocenter</span>' : '<span class="pill ok">Con comisión</span>'}</td>
+          <td class="num">${esCeprocenter ? '—' : fmt(comision)}</td>
+        </tr>`;
+      }).join('');
+      return `
+        <div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line);">
+          <h3 style="margin:0 0 6px;font-size:15px;">${modulo}</h3>
+          <p class="hint" style="margin:0 0 10px;">Ventas: ${fmt(totalVentasModulo)} — Gastos vinculados: ${fmt(gastosModulo)} — Utilidad: <b>${fmt(utilidadModulo)}</b> — Comisión Kinller (5% CEO): <b>${fmt(comisionKinllerModulo)}</b></p>
+          <div class="table-scroll"><table>
+            <thead><tr><th>#</th><th>Estudiante</th><th>Vendedor</th><th class="num">Monto</th><th>Estado</th><th class="num">Comisión (3%)</th></tr></thead>
+            <tbody>${filasHtml}</tbody>
+          </table></div>
+        </div>
+      `;
     }).join('');
+    const resumenVendedorCursoHtml = Object.entries(totalPorVendedorCurso).sort((a,b)=>b[1]-a[1])
+      .map(([v,m])=>`<tr><td>${v}</td><td class="num">${fmt(m)}</td></tr>`).join('')
+      || '<tr><td colspan="2" style="text-align:center;color:var(--text-dim);">Sin comisiones en este curso todavía.</td></tr>';
     return `
       <div class="panel">
         <h2>${curso}</h2>
-        <p class="hint">Ventas: ${fmt(totalVentasCurso)} — Gastos vinculados: ${fmt(gastosCurso)} — Utilidad: <b>${fmt(utilidadCurso)}</b> — Comisión Kinller (5% CEO): <b>${fmt(comisionKinller)}</b></p>
+        <p class="hint">Total del curso — Ventas: ${fmt(totalVentasCurso)} — Gastos: ${fmt(totalGastosCurso)} — Utilidad: <b>${fmt(totalUtilidadCurso)}</b></p>
         <div class="table-scroll"><table>
-          <thead><tr><th>#</th><th>Estudiante</th><th>Vendedor</th><th class="num">Monto</th><th>Estado</th><th class="num">Comisión (3%)</th></tr></thead>
-          <tbody>${filasHtml}</tbody>
+          <thead><tr><th>Vendedor</th><th class="num">Comisión total en este curso</th></tr></thead>
+          <tbody>${resumenVendedorCursoHtml}</tbody>
         </table></div>
+        ${modulosHtml}
       </div>
     `;
   }).join('');
   const resumenVendedores = Object.entries(totalPorVendedor).sort((a,b)=>b[1]-a[1])
-    .map(([v,m])=>`<tr><td>${v}</td><td class="num">${fmt(m)}</td></tr>`).join('') || '<tr><td colspan="2" style="text-align:center;color:var(--text-dim);">Sin comisiones generadas aún (aún no hay más de 5 ventas en ningún curso).</td></tr>';
+    .map(([v,m])=>`<tr><td>${v}</td><td class="num">${fmt(m)}</td></tr>`).join('') || '<tr><td colspan="2" style="text-align:center;color:var(--text-dim);">Sin comisiones generadas aún (aún no hay más de 5 ventas en ningún módulo).</td></tr>';
   contBox.innerHTML = `
     <div class="panel">
       <h2>Resumen de Comisiones</h2>
-      <p class="hint">Las primeras 5 ventas (las más caras) de cada curso son para Ceprocenter. A partir de la 6ta, el vendedor gana 3% de la utilidad proporcional a su venta. Kinller (CEO) se lleva 5% de la utilidad total de cada curso.</p>
+      <p class="hint">Las primeras 5 ventas (las más caras) de cada módulo son para Ceprocenter. A partir de la 6ta, el vendedor gana 3% de la utilidad proporcional a su venta. Kinller (CEO) se lleva 5% de la utilidad de cada módulo. Las ventas sin módulo asignado se agrupan bajo "(Sin módulo)" dentro de su curso.</p>
       <div class="table-scroll"><table>
         <thead><tr><th>Vendedor</th><th class="num">Comisión Total (3%)</th></tr></thead>
         <tbody>${resumenVendedores}</tbody>
@@ -929,6 +1040,8 @@ document.querySelectorAll('.tab').forEach(tab=>{
 });
 ['i_fecha','g_fecha','c_fecha','d_fecha_inicio'].forEach(id=>document.getElementById(id).valueAsDate = new Date());
 poblarSelectsCurso();
+poblarSelectModulo(document.getElementById('i_modulo'), '', '');
+poblarSelectModulo(document.getElementById('g_modulo'), '', '');
 initApp();
 </script>
 </body>
