@@ -12,7 +12,7 @@
 <style>
   :root{
     --bg: #6E7A3F; --panel: #FFFFFF; --panel-2: #F5F6FA; --line: #DEE2EA;
-    --accent: #5B63D3; --accent-soft: rgba(91,99,211,0.10); --accent-dark: #454CB8;
+    --accent: #5C7A2E; --accent-soft: rgba(92,122,46,0.10); --accent-dark: #47601F;
     --text: #24273A; --text-dim: #767C93;
     --warn: #C98A3C; --warn-soft: rgba(201,138,60,0.12);
     --danger: #D9614F; --danger-soft: rgba(217,97,79,0.10);
@@ -34,10 +34,10 @@
   .tick .n{font-family:'Quicksand',sans-serif;font-size:23px;font-weight:700;color:var(--accent);}
   .tick .n.neg{color:var(--danger);} .tick .n.warn{color:var(--warn);}
   .tick .l{font-size:11px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-dim);margin-top:2px;}
-  .tabs{display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:6px 14px 0;box-shadow:0 1px 2px rgba(36,39,58,0.04);}
-  .tab{background:none;border:none;color:var(--text-dim);font-family:'Quicksand',sans-serif;font-size:15.5px;font-weight:600;padding:10px 6px;cursor:pointer;border-bottom:2px solid transparent;margin-right:22px;}
-  .tab.active{color:var(--text);border-bottom-color:var(--accent);}
-  .tab:hover{color:var(--accent);}
+  .tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.25);flex-wrap:wrap;}
+  .tab{background:none;border:none;color:rgba(255,255,255,0.68);font-family:'Quicksand',sans-serif;font-size:15.5px;font-weight:600;padding:10px 6px;cursor:pointer;border-bottom:2px solid transparent;margin-right:22px;}
+  .tab.active{color:#FFFFFF;border-bottom-color:#EDF1CE;}
+  .tab:hover{color:#FFFFFF;}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:18px;box-shadow:0 1px 2px rgba(36,39,58,0.03);}
   .panel h2{font-size:19px;margin:0 0 4px;color:var(--text);}
   .panel .hint{color:var(--text-dim);font-size:12.5px;margin:0 0 18px;}
@@ -209,7 +209,7 @@
           </select></div>
           <div class="field"><label>Cuenta Bancaria</label><select id="g_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Zelle</option><option>PayPal</option><option>Pago Móvil</option><option>Otro</option></select></div>
           <div class="field" id="g_curso_wrap"><label>Curso (opcional, para calcular comisiones)</label><select id="g_curso" class="select-curso"></select></div>
-          <div class="field" id="g_modulo_wrap"><label>Módulo (opcional, para calcular comisiones por módulo)</label><select id="g_modulo" class="select-modulo"></select></div>
+          <div class="field" id="g_modulo_wrap"><label>Módulo (déjalo vacío si el gasto es de todo el curso)</label><select id="g_modulo" class="select-modulo"></select></div>
           <div class="field"><label>Descripción</label><input id="g_descripcion" placeholder="Detalle del gasto"></div>
           <div class="field"><label>Monto ($) <span id="g_monto_lock_hint" style="display:none;font-weight:400;text-transform:none;color:var(--text-dim);">(suma automática)</span></label><input id="g_monto" type="number" step="0.01" placeholder="0.00"></div>
           <div class="field" style="display:flex;align-items:flex-end;">
@@ -916,11 +916,26 @@ function renderComisiones(){
       if(b===SIN_MODULO) return -1;
       return a.localeCompare(b,'es');
     });
+    const gastosPorModuloDirecto = {};
+    GASTOS.filter(g=>g.curso===curso).forEach(g=>{
+      const key = g.modulo || SIN_MODULO;
+      gastosPorModuloDirecto[key] = (gastosPorModuloDirecto[key]||0) + g.monto;
+    });
+    const gastosGeneralesCurso = gastosPorModuloDirecto[SIN_MODULO] || 0;
+    const modulosReales = modulos.filter(m=>m!==SIN_MODULO);
+    const gastoGeneralPorModulo = modulosReales.length>0 ? gastosGeneralesCurso/modulosReales.length : 0;
     const totalPorVendedorCurso = {};
     const modulosHtml = modulos.map(modulo=>{
       const ventasModulo = ventasCursoTodas.filter(v=>(v.modulo||SIN_MODULO)===modulo).slice().sort((a,b)=>b.monto-a.monto);
       const totalVentasModulo = ventasModulo.reduce((s,v)=>s+v.monto,0);
-      const gastosModulo = GASTOS.filter(g=>g.curso===curso && (g.modulo||SIN_MODULO)===modulo).reduce((s,g)=>s+g.monto,0);
+      const gastosDirectos = gastosPorModuloDirecto[modulo] || 0;
+      let gastosModulo, notaGeneral='';
+      if(modulo===SIN_MODULO){
+        gastosModulo = modulosReales.length>0 ? 0 : gastosDirectos;
+      }else{
+        gastosModulo = gastosDirectos + gastoGeneralPorModulo;
+        if(gastoGeneralPorModulo>0) notaGeneral = ` (incluye ${fmt(gastoGeneralPorModulo)} de gastos generales del curso, repartidos en partes iguales)`;
+      }
       const utilidadModulo = totalVentasModulo - gastosModulo;
       const comisionKinllerModulo = utilidadModulo>0 ? utilidadModulo*0.05 : 0;
       totalKinller += comisionKinllerModulo;
@@ -945,7 +960,7 @@ function renderComisiones(){
       return `
         <div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--line);">
           <h3 style="margin:0 0 6px;font-size:15px;">${modulo}</h3>
-          <p class="hint" style="margin:0 0 10px;">Ventas: ${fmt(totalVentasModulo)} — Gastos vinculados: ${fmt(gastosModulo)} — Utilidad: <b>${fmt(utilidadModulo)}</b> — Comisión Kinller (5% CEO): <b>${fmt(comisionKinllerModulo)}</b></p>
+          <p class="hint" style="margin:0 0 10px;">Ventas: ${fmt(totalVentasModulo)} — Gastos vinculados: ${fmt(gastosModulo)}${notaGeneral} — Utilidad: <b>${fmt(utilidadModulo)}</b> — Comisión Kinller (5% CEO): <b>${fmt(comisionKinllerModulo)}</b></p>
           <div class="table-scroll"><table>
             <thead><tr><th>#</th><th>Estudiante</th><th>Vendedor</th><th class="num">Monto</th><th>Estado</th><th class="num">Comisión (3%)</th></tr></thead>
             <tbody>${filasHtml}</tbody>
@@ -973,7 +988,7 @@ function renderComisiones(){
   contBox.innerHTML = `
     <div class="panel">
       <h2>Resumen de Comisiones</h2>
-      <p class="hint">Las primeras 5 ventas (las más caras) de cada módulo son para Ceprocenter. A partir de la 6ta, el vendedor gana 3% de la utilidad proporcional a su venta. Kinller (CEO) se lleva 5% de la utilidad de cada módulo. Las ventas sin módulo asignado se agrupan bajo "(Sin módulo)" dentro de su curso.</p>
+      <p class="hint">Las primeras 5 ventas (las más caras) de cada módulo son para Ceprocenter. A partir de la 6ta, el vendedor gana 3% de la utilidad proporcional a su venta. Kinller (CEO) se lleva 5% de la utilidad de cada módulo. Las ventas sin módulo asignado se agrupan bajo "(Sin módulo)" dentro de su curso. Los gastos registrados sin módulo (gastos generales del curso) se reparten en partes iguales entre todos sus módulos.</p>
       <div class="table-scroll"><table>
         <thead><tr><th>Vendedor</th><th class="num">Comisión Total (3%)</th></tr></thead>
         <tbody>${resumenVendedores}</tbody>
