@@ -209,31 +209,36 @@
             <option>Sueldos</option><option>Diseñador</option><option>Comisiones</option><option>Arriendo</option><option>Publicidad</option><option>Contador</option><option>Softwares varios</option><option>Pago a Tutores</option><option>Gasto de Curso</option><option>Pago de Deuda</option><option>Otros</option>
           </select></div>
           <div class="field"><label>Cuenta Bancaria</label><select id="g_banco"><option>Banco Pacífico</option><option>Banco Pichincha</option><option>Banco Guayaquil</option><option>Efectivo</option><option>Zelle</option><option>PayPal</option><option>Pago Móvil</option><option>Otro</option></select></div>
-          <div class="field" id="g_curso_wrap"><label>Curso (opcional, para calcular comisiones)</label><select id="g_curso" class="select-curso"></select></div>
-          <div class="field" id="g_modulo_wrap"><label>Módulo (déjalo vacío si el gasto es de todo el curso)</label><select id="g_modulo" class="select-modulo"></select></div>
           <div class="field"><label>Descripción</label><input id="g_descripcion" placeholder="Detalle del gasto"></div>
           <div class="field"><label>Monto ($) <span id="g_monto_lock_hint" style="display:none;font-weight:400;text-transform:none;color:var(--text-dim);">(suma automática)</span></label><input id="g_monto" type="number" step="0.01" placeholder="0.00"></div>
-          <div class="field" style="display:flex;align-items:flex-end;">
-            <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer;">
-              <input type="checkbox" id="g_dividir" style="width:18px;height:18px;">
-              Dividir este gasto entre varios cursos/módulos
-            </label>
+          <div class="field" id="g_alcance_wrap"><label>Alcance del gasto</label>
+            <select id="g_alcance">
+              <option value="modulo">Un módulo específico (ej. break, material físico)</option>
+              <option value="curso">Todo un curso completo (se reparte solo entre sus módulos)</option>
+              <option value="varios">Varios cursos a la vez (ej. Zoom, gastos compartidos)</option>
+            </select>
           </div>
         </div>
-        <div id="g_splits_container" style="display:none;margin-top:14px;">
+        <div class="grid cols3" id="g_scope_simple_wrap">
+          <div class="field" id="g_curso_wrap"><label>Curso (opcional, para calcular comisiones)</label><select id="g_curso" class="select-curso"></select></div>
+          <div class="field" id="g_modulo_wrap"><label>Módulo</label><select id="g_modulo" class="select-modulo"></select></div>
+        </div>
+        <div id="g_scope_varios_wrap" style="display:none;margin-bottom:14px;">
+          <label style="display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-dim);margin-bottom:6px;">Cursos incluidos (Ctrl/Cmd+clic para elegir varios)</label>
+          <select id="g_cursos_varios" multiple size="5" style="width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:10px 11px;color:var(--text);font-family:'Nunito',sans-serif;font-size:14px;"></select>
+          <p class="hint" style="margin:8px 0 0;">El monto se divide en partes iguales entre estos cursos, y dentro de cada uno, automáticamente entre sus propios módulos.</p>
+        </div>
+        <div class="actions" style="margin-top:0;margin-bottom:14px;">
+          <button class="btn btn-ghost btn-sm" id="btn_reparto_personalizado" type="button">¿Necesitas repartir montos distintos por módulo? Usa reparto personalizado</button>
+        </div>
+        <div id="g_splits_container" style="display:none;margin-bottom:14px;">
           <p class="hint" style="margin:0 0 8px;">Indica cuánto de este gasto corresponde a cada curso/módulo. La suma se convierte en el monto total del gasto.</p>
-          <div class="grid cols3" style="margin-bottom:10px;">
-            <div class="field" style="margin-bottom:0;">
-              <label>Repartir en partes iguales entre TODOS los módulos de (elige uno o varios cursos, con Ctrl/Cmd+clic):</label>
-              <select id="g_split_cursos_equitativo" multiple size="5" style="min-height:110px;"></select>
-            </div>
-            <div class="field" style="display:flex;align-items:flex-end;margin-bottom:0;">
-              <button class="btn btn-ghost btn-sm" id="btn_repartir_equitativo" type="button">Repartir entre esos módulos</button>
-            </div>
-          </div>
           <div id="g_splits_rows"></div>
           <button class="btn btn-ghost btn-sm" id="btn_add_split" type="button">+ Agregar línea</button>
           <div class="hint" id="g_splits_total" style="margin-top:8px;"></div>
+          <div class="actions" style="margin-top:10px;">
+            <button class="btn btn-ghost btn-sm" id="btn_volver_alcance_simple" type="button">Volver al modo simple</button>
+          </div>
         </div>
         <div class="actions">
           <button class="btn btn-primary" id="btn_guardar_gasto">Guardar Gasto</button>
@@ -368,7 +373,7 @@
 <div class="toast" id="toast"></div>
 <script>
 let API_URL = localStorage.getItem('cepro_api_url') || '';
-let CAPITAL=[], INGRESOS=[], GASTOS=[], DEUDAS=[];
+let CAPITAL=[], INGRESOS=[], GASTOS=[], DEUDAS=[], COMISIONES_PAGADAS=[];
 let CURSOS = JSON.parse(localStorage.getItem('cepro_cursos')||'[]');
 function fmt(n){ return '$' + (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2}); }
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3200); }
@@ -397,7 +402,7 @@ function poblarSelectsCurso(){
   poblarSelectCursosMultiple();
 }
 function poblarSelectCursosMultiple(){
-  const sel = document.getElementById('g_split_cursos_equitativo');
+  const sel = document.getElementById('g_cursos_varios');
   if(!sel) return;
   const seleccionActual = [...sel.selectedOptions].map(o=>o.value);
   const cursosOrdenados = CURSOS.slice().sort((a,b)=>a.localeCompare(b,'es'));
@@ -709,13 +714,15 @@ function normBool(v){ return v===true || v==='TRUE' || v==='true' || v===1 || v=
 function normNum(v){ return Number(v)||0; }
 function ingresosActivos(){ return INGRESOS.filter(i=>!i.esHistorica); }
 async function loadAll(){
-  const [ing, gas, deu, cap] = await Promise.all([
-    apiGet('Ventas'), apiGet('Gastos'), apiGet('Deudas'), apiGet('Capital')
+  const [ing, gas, deu, cap, pagos] = await Promise.all([
+    apiGet('Ventas'), apiGet('Gastos'), apiGet('Deudas'), apiGet('Capital'),
+    apiGet('ComisionesPagadas').catch(()=>[])
   ]);
   INGRESOS = ing.map(i=>({...i, monto:normNum(i.monto), confirmado:normBool(i.confirmado), esHistorica:normBool(i.esHistorica)}));
   GASTOS = gas.map(g=>({...g, monto:normNum(g.monto)}));
   DEUDAS = deu.map(d=>({...d, montoTotal:normNum(d.montoTotal), cuotasTotal:normNum(d.cuotasTotal), valorCuota:normNum(d.valorCuota), cuotasPagadas:normNum(d.cuotasPagadas)}));
   CAPITAL = cap.map(c=>({...c, monto:normNum(c.monto)}));
+  COMISIONES_PAGADAS = (pagos||[]).map(p=>({...p, monto:normNum(p.monto)}));
   sincronizarCursosDesdeDatos();
   sincronizarModulosDesdeDatos();
   poblarSelectsCurso();
@@ -907,6 +914,7 @@ document.getElementById('btn_filtrar_ingresos').addEventListener('click', render
 document.getElementById('filt_i_estudiante').addEventListener('input', renderTablaIngresos);
 let editingGastoId = null;
 let dividiendoGastoId = null;
+let repartoPersonalizadoActivo = false;
 function crearSplitRow(curso='', modulo='', monto=''){
   const row = document.createElement('div');
   row.className = 'split-row';
@@ -930,62 +938,51 @@ window.recalcSplitTotal = function(){
   document.getElementById('g_splits_total').textContent = `Total dividido: ${fmt(total)}`;
 };
 document.getElementById('btn_add_split').addEventListener('click', ()=>crearSplitRow());
-document.getElementById('btn_repartir_equitativo').addEventListener('click', ()=>{
-  const selCursos = document.getElementById('g_split_cursos_equitativo');
-  const cursosElegidos = [...selCursos.selectedOptions].map(o=>o.value).filter(Boolean);
-  if(cursosElegidos.length===0){ showToast('Selecciona al menos un curso.'); return; }
-  const pares = [];
-  cursosElegidos.forEach(curso=>{
-    const mods = (MODULOS[curso]||[]).slice().sort((a,b)=>a.localeCompare(b,'es'));
-    mods.forEach(m=>pares.push({curso, modulo:m}));
-  });
-  if(pares.length===0){ showToast('Esos cursos no tienen módulos definidos. Agrégalos en la pestaña "Cursos".'); return; }
-  const totalActual = Number(document.getElementById('g_monto').value)||0;
-  const porLinea = totalActual>0 ? (totalActual/pares.length) : '';
-  document.getElementById('g_splits_rows').innerHTML='';
-  pares.forEach(p=>crearSplitRow(p.curso, p.modulo, porLinea===''?'':porLinea.toFixed(2)));
-  recalcSplitTotal();
-  showToast(`Se crearon ${pares.length} línea(s) entre ${cursosElegidos.length} curso(s).`);
-});
-document.getElementById('g_dividir').addEventListener('change', (e)=>{
-  const container = document.getElementById('g_splits_container');
-  const cursoWrap = document.getElementById('g_curso_wrap');
-  const moduloWrap = document.getElementById('g_modulo_wrap');
-  const montoInput = document.getElementById('g_monto');
-  const lockHint = document.getElementById('g_monto_lock_hint');
-  if(e.target.checked){
-    container.style.display='block';
-    cursoWrap.style.display='none';
-    moduloWrap.style.display='none';
-    montoInput.readOnly = true;
-    lockHint.style.display='inline';
-    if(document.getElementById('g_splits_rows').children.length===0){
-      crearSplitRow(); crearSplitRow();
-    }
-    recalcSplitTotal();
-  }else{
-    container.style.display='none';
-    cursoWrap.style.display='block';
-    moduloWrap.style.display='block';
-    montoInput.readOnly = false;
-    lockHint.style.display='none';
-    document.getElementById('g_splits_rows').innerHTML='';
+function actualizarAlcanceGasto(){
+  const alcance = document.getElementById('g_alcance').value;
+  document.getElementById('g_modulo_wrap').style.display = (alcance==='modulo') ? 'block' : 'none';
+  document.getElementById('g_curso_wrap').style.display = (alcance==='varios') ? 'none' : 'block';
+  document.getElementById('g_scope_varios_wrap').style.display = (alcance==='varios') ? 'block' : 'none';
+}
+document.getElementById('g_alcance').addEventListener('change', actualizarAlcanceGasto);
+function activarRepartoPersonalizado(){
+  repartoPersonalizadoActivo = true;
+  document.getElementById('g_alcance_wrap').style.display='none';
+  document.getElementById('g_scope_simple_wrap').style.display='none';
+  document.getElementById('g_scope_varios_wrap').style.display='none';
+  document.getElementById('btn_reparto_personalizado').style.display='none';
+  document.getElementById('g_splits_container').style.display='block';
+  document.getElementById('g_monto').readOnly = true;
+  document.getElementById('g_monto_lock_hint').style.display='inline';
+  if(document.getElementById('g_splits_rows').children.length===0){
+    crearSplitRow(); crearSplitRow();
   }
-});
+  recalcSplitTotal();
+}
+function desactivarRepartoPersonalizado(){
+  repartoPersonalizadoActivo = false;
+  document.getElementById('g_alcance_wrap').style.display='block';
+  document.getElementById('g_scope_simple_wrap').style.display='';
+  actualizarAlcanceGasto();
+  document.getElementById('btn_reparto_personalizado').style.display='inline-block';
+  document.getElementById('g_splits_container').style.display='none';
+  document.getElementById('g_monto').readOnly = false;
+  document.getElementById('g_monto_lock_hint').style.display='none';
+  document.getElementById('g_splits_rows').innerHTML='';
+}
+document.getElementById('btn_reparto_personalizado').addEventListener('click', activarRepartoPersonalizado);
+document.getElementById('btn_volver_alcance_simple').addEventListener('click', desactivarRepartoPersonalizado);
 function limpiarFormularioGasto(){
   document.getElementById('g_curso').value='';
   poblarSelectModulo(document.getElementById('g_modulo'), '', '');
   document.getElementById('g_descripcion').value='';
   document.getElementById('g_monto').value='';
-  document.getElementById('g_dividir').checked=false;
-  document.getElementById('g_splits_container').style.display='none';
-  document.getElementById('g_curso_wrap').style.display='block';
-  document.getElementById('g_modulo_wrap').style.display='block';
-  document.getElementById('g_monto').readOnly=false;
-  document.getElementById('g_monto_lock_hint').style.display='none';
-  document.getElementById('g_splits_rows').innerHTML='';
-  const selCursosEquitativo = document.getElementById('g_split_cursos_equitativo');
-  if(selCursosEquitativo) [...selCursosEquitativo.options].forEach(o=>o.selected=false);
+  document.getElementById('g_alcance').value='modulo';
+  const opcionVarios = document.querySelector('#g_alcance option[value="varios"]');
+  if(opcionVarios) opcionVarios.disabled=false;
+  const selVarios = document.getElementById('g_cursos_varios');
+  if(selVarios) [...selVarios.options].forEach(o=>o.selected=false);
+  desactivarRepartoPersonalizado();
   editingGastoId=null; dividiendoGastoId=null;
   document.getElementById('g_panel_titulo').textContent='Registrar Gasto';
   document.getElementById('g_edit_hint').style.display='none';
@@ -1002,6 +999,10 @@ window.editarGasto = function(id){
   document.getElementById('g_banco').value = g.banco;
   document.getElementById('g_curso').value = g.curso||'';
   poblarSelectModulo(document.getElementById('g_modulo'), g.curso||'', g.modulo||'');
+  document.getElementById('g_alcance').value = g.modulo ? 'modulo' : 'curso';
+  const opcionVarios = document.querySelector('#g_alcance option[value="varios"]');
+  if(opcionVarios) opcionVarios.disabled=true;
+  actualizarAlcanceGasto();
   document.getElementById('g_descripcion').value = g.descripcion||'';
   document.getElementById('g_monto').value = g.monto;
   document.getElementById('g_panel_titulo').textContent='Editar Gasto';
@@ -1020,22 +1021,15 @@ window.dividirGasto = function(id){
   document.getElementById('g_categoria').value = g.categoria;
   document.getElementById('g_banco').value = g.banco;
   document.getElementById('g_descripcion').value = g.descripcion||'';
-  document.getElementById('g_dividir').checked = true;
-  document.getElementById('g_splits_container').style.display='block';
-  document.getElementById('g_curso_wrap').style.display='none';
-  document.getElementById('g_modulo_wrap').style.display='none';
-  document.getElementById('g_monto').readOnly = true;
-  document.getElementById('g_monto_lock_hint').style.display='inline';
+  activarRepartoPersonalizado();
   document.getElementById('g_splits_rows').innerHTML='';
   crearSplitRow(g.curso||'', g.modulo||'', g.monto);
   crearSplitRow('', '', '');
   recalcSplitTotal();
-  const selCursosEquitativo = document.getElementById('g_split_cursos_equitativo');
-  if(selCursosEquitativo && g.curso) [...selCursosEquitativo.options].forEach(o=>{ o.selected = (o.value===g.curso); });
-  document.getElementById('g_panel_titulo').textContent='Dividir Gasto entre Cursos/Módulos';
+  document.getElementById('g_panel_titulo').textContent='Reparto Personalizado del Gasto';
   document.getElementById('g_edit_hint').style.display='block';
-  document.getElementById('g_edit_hint').textContent=`Este gasto de ${fmt(g.monto)} se eliminará y se reemplazará por las líneas divididas que definas abajo.`;
-  document.getElementById('btn_guardar_gasto').textContent='Guardar División';
+  document.getElementById('g_edit_hint').textContent=`Este gasto de ${fmt(g.monto)} se eliminará y se reemplazará por las líneas que definas abajo.`;
+  document.getElementById('btn_guardar_gasto').textContent='Guardar Reparto';
   document.getElementById('btn_cancelar_gasto').style.display='inline-block';
   document.getElementById('tab-gastos').scrollIntoView({behavior:'smooth'});
 };
@@ -1045,31 +1039,42 @@ document.getElementById('btn_guardar_gasto').addEventListener('click', async ()=
   const categoria=document.getElementById('g_categoria').value;
   const banco=document.getElementById('g_banco').value;
   const descripcion=document.getElementById('g_descripcion').value.trim();
-  const dividiendo=document.getElementById('g_dividir').checked;
   try{
-    if(dividiendo){
+    if(repartoPersonalizadoActivo){
       const splits=[...document.getElementById('g_splits_rows').children].map(row=>({
         curso: row.querySelector('.split-curso').value.trim(),
         modulo: row.querySelector('.split-modulo').value.trim(),
         monto: Number(row.querySelector('.split-monto').value)||0
       })).filter(s=>s.curso && s.monto>0);
-      if(splits.length<2){ showToast('Agrega al menos 2 líneas con curso y monto para dividir.'); return; }
+      if(splits.length<2){ showToast('Agrega al menos 2 líneas con curso y monto.'); return; }
       if(dividiendoGastoId){ await apiPost('Gastos','delete',{id:dividiendoGastoId}); }
       for(const s of splits){
         await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso:s.curso, modulo:s.modulo, descripcion: descripcion ? `${descripcion} (dividido)` : '(dividido)', monto:s.monto}});
       }
       showToast('Gasto dividido y guardado.');
     }else{
-      const curso=document.getElementById('g_curso').value.trim();
-      const modulo=document.getElementById('g_modulo').value.trim();
-      const monto=Number(document.getElementById('g_monto').value)||0;
+      const alcance = document.getElementById('g_alcance').value;
+      const monto = Number(document.getElementById('g_monto').value)||0;
       if(monto<=0){ showToast('El monto debe ser mayor a 0.'); return; }
-      if(editingGastoId){
-        await apiPost('Gastos','update',{id:editingGastoId, data:{fecha, categoria, banco, curso, modulo, descripcion, monto}});
-        showToast('Gasto actualizado.');
+      if(alcance==='varios'){
+        const selVarios = document.getElementById('g_cursos_varios');
+        const cursosElegidos = [...selVarios.selectedOptions].map(o=>o.value).filter(Boolean);
+        if(cursosElegidos.length===0){ showToast('Selecciona al menos un curso.'); return; }
+        const montoPorCurso = monto/cursosElegidos.length;
+        for(const curso of cursosElegidos){
+          await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso, modulo:'', descripcion: descripcion ? `${descripcion} (compartido entre ${cursosElegidos.length} cursos)` : `(compartido entre ${cursosElegidos.length} cursos)`, monto:montoPorCurso}});
+        }
+        showToast(`Gasto repartido entre ${cursosElegidos.length} curso(s) (y automáticamente entre los módulos de cada uno).`);
       }else{
-        await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso, modulo, descripcion, monto}});
-        showToast('Gasto guardado.');
+        const curso=document.getElementById('g_curso').value.trim();
+        const modulo=(alcance==='modulo') ? document.getElementById('g_modulo').value.trim() : '';
+        if(editingGastoId){
+          await apiPost('Gastos','update',{id:editingGastoId, data:{fecha, categoria, banco, curso, modulo, descripcion, monto}});
+          showToast('Gasto actualizado.');
+        }else{
+          await apiPost('Gastos','add',{data:{id:uid(), fecha, categoria, banco, curso, modulo, descripcion, monto}});
+          showToast('Gasto guardado.');
+        }
       }
     }
     limpiarFormularioGasto();
@@ -1201,16 +1206,55 @@ function poblarFiltroModuloComisiones(){
   const valActual = selModulo.value;
   selModulo.innerHTML = '<option value="">Todos los módulos</option>' + mods.map(m=>`<option value="${m.replace(/"/g,'&quot;')}" ${m===valActual?'selected':''}>${m}</option>`).join('');
 }
+function comisionPagoKey(curso, vendedor){ return normalizarBusqueda(curso||'')+'|'+normalizarBusqueda(vendedor||''); }
+function buscarPagoComision(curso, vendedor){
+  return COMISIONES_PAGADAS.find(p=>comisionPagoKey(p.curso,p.vendedor)===comisionPagoKey(curso,vendedor));
+}
+window.marcarComisionPagada = async function(curso, vendedor, monto){
+  try{
+    const existente = buscarPagoComision(curso, vendedor);
+    const fecha = new Date().toISOString().slice(0,10);
+    if(existente){
+      await apiPost('ComisionesPagadas','update',{id:existente.id, data:{curso, vendedor, monto, fecha}});
+    }else{
+      await apiPost('ComisionesPagadas','add',{data:{id:uid(), curso, vendedor, monto, fecha}});
+    }
+    showToast('Comisión marcada como pagada.');
+    await loadAll();
+  }catch(e){ showToast('No se pudo registrar el pago: '+e.message+'. Verifica que exista una pestaña "ComisionesPagadas" en tu Google Sheet con columnas: id, curso, vendedor, monto, fecha.'); }
+};
+window.desmarcarComisionPagada = async function(id){
+  try{
+    await apiPost('ComisionesPagadas','delete',{id});
+    showToast('Pago desmarcado.');
+    await loadAll();
+  }catch(e){ showToast('Error: '+e.message); }
+};
+function pagoComisionHtml(curso, vendedor, montoActual){
+  const pago = buscarPagoComision(curso, vendedor);
+  const montoStr = montoActual.toFixed(2);
+  if(pago && Math.abs(pago.monto - montoActual) < 0.01){
+    return `<span class="pill ok">Pagada (${fechaCorta(pago.fecha)})</span> <button class="btn btn-ghost btn-sm" onclick="desmarcarComisionPagada('${pago.id}')">Desmarcar</button>`;
+  }
+  if(pago){
+    return `<span class="pill na">Monto cambió desde el pago</span> <button class="btn btn-ghost btn-sm" onclick="marcarComisionPagada('${curso.replace(/'/g,"\\'")}','${vendedor.replace(/'/g,"\\'")}',${montoActual})">Actualizar pago</button>`;
+  }
+  return `<button class="btn btn-ghost btn-sm" onclick="marcarComisionPagada('${curso.replace(/'/g,"\\'")}','${vendedor.replace(/'/g,"\\'")}',${montoActual})">Marcar como pagada</button>`;
+}
 function renderComisiones(){
   poblarFiltroComisiones();
   poblarFiltroModuloComisiones();
   const filtroCurso = document.getElementById('comisiones_filtro_curso') ? document.getElementById('comisiones_filtro_curso').value : '';
   const filtroModulo = document.getElementById('comisiones_filtro_modulo') ? document.getElementById('comisiones_filtro_modulo').value : '';
-  let cursos = [...new Set(ingresosActivos().map(i=>i.curso).filter(Boolean))].sort();
-  if(filtroCurso) cursos = cursos.filter(c=>c===filtroCurso);
   const contBox = document.getElementById('comisiones_content');
   if(!contBox) return;
-  if(cursos.length===0){ contBox.innerHTML = `<div class="panel"><p class="hint" style="margin:0;">${filtroCurso?'Este curso no tiene ventas registradas.':'Aún no hay ventas registradas.'}</p></div>`; return; }
+  if(!filtroCurso){
+    contBox.innerHTML = `<div class="panel"><p class="hint" style="margin:0;">Elige un curso arriba para ver su detalle de comisiones.</p></div>`;
+    return;
+  }
+  let cursos = [...new Set(ingresosActivos().map(i=>i.curso).filter(Boolean))].sort();
+  cursos = cursos.filter(c=>c===filtroCurso);
+  if(cursos.length===0){ contBox.innerHTML = `<div class="panel"><p class="hint" style="margin:0;">Este curso no tiene ventas registradas.</p></div>`; return; }
   const totalPorVendedor = {};
   let totalKinller = 0;
   let totalComisionesGeneral = 0;
@@ -1278,14 +1322,14 @@ function renderComisiones(){
       `;
     }).join('');
     const resumenVendedorCursoHtml = Object.entries(totalPorVendedorCurso).sort((a,b)=>b[1]-a[1])
-      .map(([v,m])=>`<tr><td>${v}</td><td class="num">${fmt(m)}</td></tr>`).join('')
-      || '<tr><td colspan="2" style="text-align:center;color:var(--text-dim);">Sin comisiones en este curso todavía.</td></tr>';
+      .map(([v,m])=>`<tr><td>${v}</td><td class="num">${fmt(m)}</td><td>${pagoComisionHtml(curso, v, m)}</td></tr>`).join('')
+      || '<tr><td colspan="3" style="text-align:center;color:var(--text-dim);">Sin comisiones en este curso todavía.</td></tr>';
     return `
       <div class="panel">
         <h2>${curso}</h2>
         <p class="hint">Total del curso — Ventas: ${fmt(totalVentasCurso)} — Gastos: ${fmt(totalGastosCurso)} — Utilidad: <b>${fmt(totalUtilidadCurso)}</b></p>
         <div class="table-scroll"><table>
-          <thead><tr><th>Vendedor</th><th class="num">Comisión total en este curso</th></tr></thead>
+          <thead><tr><th>Vendedor</th><th class="num">Comisión total en este curso</th><th>Pago</th></tr></thead>
           <tbody>${resumenVendedorCursoHtml}</tbody>
         </table></div>
         ${modulosHtml}
