@@ -1230,16 +1230,74 @@ window.desmarcarComisionPagada = async function(id){
     await loadAll();
   }catch(e){ showToast('Error: '+e.message); }
 };
-function pagoComisionHtml(curso, vendedor, montoActual){
-  const pago = buscarPagoComision(curso, vendedor);
-  const montoStr = montoActual.toFixed(2);
+function claveMes(mes){ return '__MES__:'+mes; }
+function buscarPagoComisionMes(mes, vendedor){ return buscarPagoComision(claveMes(mes), vendedor); }
+window.marcarComisionPagadaMes = function(mes, vendedor, monto){ return marcarComisionPagada(claveMes(mes), vendedor, monto); };
+function pagoComisionMesHtml(mes, vendedor, montoActual){
+  const pago = buscarPagoComisionMes(mes, vendedor);
+  const vendedorEsc = vendedor.replace(/'/g,"\\'");
   if(pago && Math.abs(pago.monto - montoActual) < 0.01){
     return `<span class="pill ok">Pagada (${fechaCorta(pago.fecha)})</span> <button class="btn btn-ghost btn-sm" onclick="desmarcarComisionPagada('${pago.id}')">Desmarcar</button>`;
   }
   if(pago){
-    return `<span class="pill na">Monto cambió desde el pago</span> <button class="btn btn-ghost btn-sm" onclick="marcarComisionPagada('${curso.replace(/'/g,"\\'")}','${vendedor.replace(/'/g,"\\'")}',${montoActual})">Actualizar pago</button>`;
+    return `<span class="pill na">Monto cambió desde el pago</span> <button class="btn btn-ghost btn-sm" onclick="marcarComisionPagadaMes('${mes}','${vendedorEsc}',${montoActual})">Actualizar pago</button>`;
   }
-  return `<button class="btn btn-ghost btn-sm" onclick="marcarComisionPagada('${curso.replace(/'/g,"\\'")}','${vendedor.replace(/'/g,"\\'")}',${montoActual})">Marcar como pagada</button>`;
+  return `<button class="btn btn-ghost btn-sm" onclick="marcarComisionPagadaMes('${mes}','${vendedorEsc}',${montoActual})">Marcar como pagada</button>`;
+}
+function calcularComisionesPorMes(){
+  const SIN_MODULO = '(Sin módulo)';
+  const cursos = [...new Set(ingresosActivos().map(i=>i.curso).filter(Boolean))];
+  const porMes = {};
+  cursos.forEach(curso=>{
+    const ventasCursoTodas = ingresosActivos().filter(i=>i.curso===curso);
+    const modulosMatriz = (MODULOS[curso]||[]).filter(m=>!esInscripcion(m));
+    const modulosDesdeVentas = ventasCursoTodas.map(v=>v.modulo).filter(Boolean).filter(m=>!esInscripcion(m));
+    const modulosReales = [...new Set([...modulosMatriz, ...modulosDesdeVentas])];
+    const gastosPorModuloDirecto = {};
+    GASTOS.filter(g=>g.curso===curso).forEach(g=>{
+      const key = g.modulo || SIN_MODULO;
+      gastosPorModuloDirecto[key] = (gastosPorModuloDirecto[key]||0) + g.monto;
+    });
+    const gastosGeneralesCurso = gastosPorModuloDirecto[SIN_MODULO] || 0;
+    const gastoGeneralPorModulo = modulosReales.length>0 ? gastosGeneralesCurso/modulosReales.length : 0;
+    modulosReales.forEach(modulo=>{
+      const ventasModulo = ventasCursoTodas.filter(v=>v.modulo===modulo && !esInscripcion(modulo)).slice().sort((a,b)=>b.monto-a.monto);
+      const totalVentasModulo = ventasModulo.reduce((s,v)=>s+v.monto,0);
+      const gastosDirectos = gastosPorModuloDirecto[modulo] || 0;
+      const gastosModulo = gastosDirectos + gastoGeneralPorModulo;
+      const utilidadModulo = totalVentasModulo - gastosModulo;
+      ventasModulo.forEach((v,i)=>{
+        const esCeprocenter = i<5;
+        if(!esCeprocenter && utilidadModulo>0 && totalVentasModulo>0){
+          const comision = 0.03 * (v.monto/totalVentasModulo) * utilidadModulo;
+          const mes = (v.fecha||'').slice(0,7) || 'Sin fecha';
+          if(!porMes[mes]) porMes[mes] = {};
+          porMes[mes][v.asesor] = (porMes[mes][v.asesor]||0) + comision;
+        }
+      });
+    });
+  });
+  return porMes;
+}
+function renderResumenMensualComisiones(){
+  const datos = calcularComisionesPorMes();
+  const meses = Object.keys(datos).sort((a,b)=>b.localeCompare(a));
+  if(meses.length===0) return `<div class="panel"><p class="hint" style="margin:0;">Aún no hay comisiones generadas.</p></div>`;
+  return meses.map(mes=>{
+    const porVendedor = datos[mes];
+    const totalMes = Object.values(porVendedor).reduce((s,m)=>s+m,0);
+    const filas = Object.entries(porVendedor).sort((a,b)=>b[1]-a[1])
+      .map(([v,m])=>`<tr><td>${v}</td><td class="num">${fmt(m)}</td><td>${pagoComisionMesHtml(mes, v, m)}</td></tr>`).join('');
+    const label = mes==='Sin fecha' ? 'Sin fecha' : new Date(mes+'-01').toLocaleDateString('es-EC',{month:'long',year:'numeric'});
+    return `<div class="panel">
+      <h2 style="text-transform:capitalize;">${label}</h2>
+      <p class="hint">Total a pagar en comisiones este mes (todos los cursos): <b>${fmt(totalMes)}</b></p>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Vendedor</th><th class="num">Comisión</th><th>Pago</th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table></div>
+    </div>`;
+  }).join('');
 }
 function renderComisiones(){
   poblarFiltroComisiones();
@@ -1249,7 +1307,7 @@ function renderComisiones(){
   const contBox = document.getElementById('comisiones_content');
   if(!contBox) return;
   if(!filtroCurso){
-    contBox.innerHTML = `<div class="panel"><p class="hint" style="margin:0;">Elige un curso arriba para ver su detalle de comisiones.</p></div>`;
+    contBox.innerHTML = `<div class="panel"><h2>Resumen Mensual de Comisiones (Todos los Cursos)</h2><p class="hint">Total que debes pagar a cada vendedor por mes, sumando todos los cursos. Elige un curso arriba para ver el detalle por módulo y por venta.</p></div>` + renderResumenMensualComisiones();
     return;
   }
   let cursos = [...new Set(ingresosActivos().map(i=>i.curso).filter(Boolean))].sort();
@@ -1322,14 +1380,15 @@ function renderComisiones(){
       `;
     }).join('');
     const resumenVendedorCursoHtml = Object.entries(totalPorVendedorCurso).sort((a,b)=>b[1]-a[1])
-      .map(([v,m])=>`<tr><td>${v}</td><td class="num">${fmt(m)}</td><td>${pagoComisionHtml(curso, v, m)}</td></tr>`).join('')
-      || '<tr><td colspan="3" style="text-align:center;color:var(--text-dim);">Sin comisiones en este curso todavía.</td></tr>';
+      .map(([v,m])=>`<tr><td>${v}</td><td class="num">${fmt(m)}</td></tr>`).join('')
+      || '<tr><td colspan="2" style="text-align:center;color:var(--text-dim);">Sin comisiones en este curso todavía.</td></tr>';
     return `
       <div class="panel">
         <h2>${curso}</h2>
         <p class="hint">Total del curso — Ventas: ${fmt(totalVentasCurso)} — Gastos: ${fmt(totalGastosCurso)} — Utilidad: <b>${fmt(totalUtilidadCurso)}</b></p>
+        <p class="hint">El pago a vendedores se registra y marca en el "Resumen Mensual de Comisiones" (vista "Todos los cursos"), ya que se paga por mes sumando todos los cursos del período.</p>
         <div class="table-scroll"><table>
-          <thead><tr><th>Vendedor</th><th class="num">Comisión total en este curso</th><th>Pago</th></tr></thead>
+          <thead><tr><th>Vendedor</th><th class="num">Comisión total en este curso</th></tr></thead>
           <tbody>${resumenVendedorCursoHtml}</tbody>
         </table></div>
         ${modulosHtml}
