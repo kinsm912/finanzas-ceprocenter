@@ -11,7 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #EEF0F5; --panel: #FFFFFF; --panel-2: #F5F6FA; --line: #DEE2EA;
+    --bg: #6E7A3F; --panel: #FFFFFF; --panel-2: #F5F6FA; --line: #DEE2EA;
     --accent: #5B63D3; --accent-soft: rgba(91,99,211,0.10); --accent-dark: #454CB8;
     --text: #24273A; --text-dim: #767C93;
     --warn: #C98A3C; --warn-soft: rgba(201,138,60,0.12);
@@ -22,9 +22,12 @@
   body{margin:0;background:var(--bg);color:var(--text);font-family:'Nunito',sans-serif;-webkit-font-smoothing:antialiased;}
   h1,h2,h3{font-family:'Quicksand',sans-serif;letter-spacing:0.01em;}
   .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
-  .top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:22px;border-bottom:1px solid var(--line);padding-bottom:18px;}
-  .top h1{font-size:27px;font-weight:700;margin:0;color:var(--text);}
-  .top .sub{color:var(--text-dim);font-size:13.5px;margin-top:4px;}
+  .top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:22px;border-bottom:1px solid rgba(255,255,255,0.25);padding-bottom:18px;}
+  .top h1{font-size:27px;font-weight:700;margin:0;color:#FFFFFF;}
+  .top .sub{color:rgba(255,255,255,0.75);font-size:13.5px;margin-top:4px;}
+  .top .btn-ghost{background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.4);color:#FFFFFF;}
+  .top .btn-ghost:hover{background:rgba(255,255,255,0.22);border-color:#FFFFFF;color:#FFFFFF;}
+  .top .accent{color:#EDF1CE;}
   .accent{color:var(--accent);}
   .ticker{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:24px;}
   .tick{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:0 1px 2px rgba(36,39,58,0.04);}
