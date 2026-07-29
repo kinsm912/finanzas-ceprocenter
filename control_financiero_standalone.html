@@ -314,7 +314,16 @@
       <div id="matriz_cursos_content"></div>
       <div class="panel">
         <h2>Ventas sin Módulo Asignado</h2>
-        <p class="hint">Ventas que llegaron antes de corregir el enlace con Matrículas (o que se registraron sin módulo). El valor de "Tipo" muchas veces ya trae el módulo real — revísalo, ajústalo si hace falta, y guarda fila por fila o todas de una vez.</p>
+        <p class="hint">Ventas que llegaron antes de corregir el enlace con Matrículas (o que se registraron sin módulo). Puedes buscar la coincidencia exacta directamente en Matrículas, o revisar la sugerencia basada en "Tipo".</p>
+        <div class="grid cols3" style="margin-bottom:14px;">
+          <div class="field"><label>URL de Apps Script de Matrículas</label><input id="matriculas_api_url_input" placeholder="https://script.google.com/macros/s/xxxxx/exec"></div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn btn-ghost btn-sm" id="btn_guardar_matriculas_url">Guardar URL</button>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn btn-primary btn-sm" id="btn_buscar_matriculas">Buscar coincidencias en Matrículas</button>
+          </div>
+        </div>
         <div class="actions" style="margin-top:0;margin-bottom:14px;">
           <button class="btn btn-ghost btn-sm" id="btn_guardar_todas_vsm">Guardar todas las que tengan módulo seleccionado</button>
         </div>
@@ -484,6 +493,51 @@ document.getElementById('btn_matriz_agregar_curso').addEventListener('click', ()
   showToast('Curso agregado.');
 });
 const TIPOS_FIJOS_VENTA = ['inscripcion','masterclass','diplomado','entrenamiento','seminario'];
+let MATRICULAS_API_URL = localStorage.getItem('cepro_matriculas_api_url') || '';
+let SUGERENCIAS_MATRICULAS = {};
+document.getElementById('matriculas_api_url_input').value = MATRICULAS_API_URL;
+document.getElementById('btn_guardar_matriculas_url').addEventListener('click', ()=>{
+  const val = document.getElementById('matriculas_api_url_input').value.trim();
+  if(!val.startsWith('https://script.google.com/')){ showToast('Esa URL no parece de Apps Script.'); return; }
+  MATRICULAS_API_URL = val;
+  localStorage.setItem('cepro_matriculas_api_url', val);
+  showToast('URL de Matrículas guardada.');
+});
+async function fetchPagosMatriculas(){
+  if(!MATRICULAS_API_URL){ showToast('Primero guarda la URL del Apps Script de Matrículas.'); return null; }
+  try{
+    const res = await fetch(`${MATRICULAS_API_URL}?sheet=Pagos`);
+    const json = await res.json();
+    if(json.error) throw new Error(json.error);
+    return json;
+  }catch(e){
+    showToast('No se pudo leer Matrículas: '+e.message);
+    return null;
+  }
+}
+document.getElementById('btn_buscar_matriculas').addEventListener('click', async ()=>{
+  showToast('Buscando coincidencias en Matrículas...');
+  const pagos = await fetchPagosMatriculas();
+  if(!pagos) return;
+  const candidatos = INGRESOS.filter(i=>!i.modulo && i.curso);
+  let encontrados = 0, ambiguos = 0;
+  candidatos.forEach(v=>{
+    const coincidencias = pagos.filter(p=>
+      p.curso===v.curso &&
+      normalizarBusqueda(p.estudiante)===normalizarBusqueda(v.concepto) &&
+      Math.abs((Number(p.monto)||0) - v.monto) < 0.01 &&
+      String(p.fecha).slice(0,10)===String(v.fecha).slice(0,10)
+    );
+    if(coincidencias.length===1 && coincidencias[0].modulo){
+      SUGERENCIAS_MATRICULAS[v.id] = coincidencias[0].modulo;
+      encontrados++;
+    }else if(coincidencias.length>1){
+      ambiguos++;
+    }
+  });
+  showToast(`${encontrados} coincidencia(s) exacta(s) encontradas${ambiguos>0?`, ${ambiguos} ambigua(s) sin aplicar`:''}.`);
+  renderVentasSinModulo();
+});
 function renderVentasSinModulo(){
   const body = document.getElementById('tabla_ventas_sin_modulo');
   const empty = document.getElementById('vsm_empty');
@@ -494,15 +548,24 @@ function renderVentasSinModulo(){
   body.innerHTML = rows.map(i=>{
     const tipoEsFijo = TIPOS_FIJOS_VENTA.includes(normalizarBusqueda(i.tipo));
     const modulosDelCurso = MODULOS[i.curso]||[];
-    const coincide = modulosDelCurso.find(m=>normalizarBusqueda(m)===normalizarBusqueda(i.tipo));
-    const sugerido = (!tipoEsFijo && i.tipo) ? (coincide || i.tipo) : '';
+    const coincideTipo = modulosDelCurso.find(m=>normalizarBusqueda(m)===normalizarBusqueda(i.tipo));
+    const sugeridoMatriculas = SUGERENCIAS_MATRICULAS[i.id];
+    let sugerido = '', badge = '';
+    if(sugeridoMatriculas){
+      sugerido = sugeridoMatriculas;
+      badge = ' <span class="pill ok">✓ Coincidencia en Matrículas</span>';
+    }else if(!tipoEsFijo && i.tipo){
+      sugerido = coincideTipo || i.tipo;
+      badge = ' <span class="pill na">Sugerido desde "Tipo"</span>';
+    }
+    if(sugerido) agregarModuloSiNoExiste(i.curso, sugerido);
     return `<tr>
       <td>${fechaCorta(i.fecha)}</td>
       <td>${i.curso}</td>
       <td>${i.concepto}</td>
       <td>${i.tipo||'—'}${tipoEsFijo?' <span class="pill na">Parece tipo, no módulo</span>':''}</td>
       <td class="num">${fmt(i.monto)}</td>
-      <td><select class="select-modulo vsm-modulo" data-curso="${i.curso.replace(/"/g,'&quot;')}" data-venta-id="${i.id}">${moduloOptionsHtml(i.curso, sugerido)}</select></td>
+      <td><select class="select-modulo vsm-modulo" data-curso="${i.curso.replace(/"/g,'&quot;')}" data-venta-id="${i.id}">${moduloOptionsHtml(i.curso, sugerido)}</select>${badge}</td>
       <td><button class="btn btn-ghost btn-sm" onclick="guardarModuloVenta('${i.id}')">Guardar</button></td>
     </tr>`;
   }).join('');
