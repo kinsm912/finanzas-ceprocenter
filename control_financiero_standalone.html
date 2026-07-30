@@ -84,16 +84,21 @@
   .setup-banner h3{margin:0 0 8px;color:var(--warn);font-size:16px;}
   .setup-banner input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);margin:8px 0;font-family:'Nunito',sans-serif;font-size:13px;}
   @media print{ .tabs, .actions, .filters, .top .sub{display:none !important;} body{background:#fff;} }
+  #tab-gastos .table-scroll{overflow-x:hidden;}
+  #tab-gastos .table-scroll table{table-layout:fixed;width:100%;}
+  #tab-gastos .table-scroll th, #tab-gastos .table-scroll td{white-space:normal;word-wrap:break-word;overflow-wrap:break-word;vertical-align:top;}
   @media(max-width:720px){
-    #tab-gastos .table-scroll table thead{display:none;}
-    #tab-gastos .table-scroll table, #tab-gastos .table-scroll tbody, #tab-gastos .table-scroll tr, #tab-gastos .table-scroll td{display:block;width:100%;}
-    #tab-gastos .table-scroll table{border:none;}
-    #tab-gastos .table-scroll tbody tr{border:1px solid var(--line);border-radius:9px;margin-bottom:10px;padding:6px 12px;background:var(--panel);}
-    #tab-gastos .table-scroll tfoot tr{border-top:1px solid var(--accent);padding:6px 12px;}
-    #tab-gastos .table-scroll td{border:none;white-space:normal;padding:6px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:right;}
-    #tab-gastos .table-scroll td.num{text-align:right;}
-    #tab-gastos .table-scroll td[data-label]::before{content:attr(data-label);font-weight:700;color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em;text-align:left;flex-shrink:0;margin-right:10px;}
-    #tab-gastos .table-scroll td:not([data-label]){justify-content:flex-end;}
+    #tab-gastos .table-scroll th, #tab-gastos .table-scroll td{font-size:11px;padding:7px 4px;line-height:1.35;}
+    #tab-gastos .table-scroll th:nth-child(1), #tab-gastos .table-scroll td:nth-child(1){width:11%;}
+    #tab-gastos .table-scroll th:nth-child(2), #tab-gastos .table-scroll td:nth-child(2){width:13%;}
+    #tab-gastos .table-scroll th:nth-child(3), #tab-gastos .table-scroll td:nth-child(3){width:13%;}
+    #tab-gastos .table-scroll th:nth-child(4), #tab-gastos .table-scroll td:nth-child(4){width:12%;}
+    #tab-gastos .table-scroll th:nth-child(5), #tab-gastos .table-scroll td:nth-child(5){width:19%;}
+    #tab-gastos .table-scroll th:nth-child(6), #tab-gastos .table-scroll td:nth-child(6){width:12%;}
+    #tab-gastos .table-scroll th:nth-child(7), #tab-gastos .table-scroll td:nth-child(7){width:11%;}
+    #tab-gastos .table-scroll th:nth-child(8), #tab-gastos .table-scroll td:nth-child(8){width:9%;}
+    #tab-gastos .table-scroll td:last-child{display:flex;flex-direction:column;gap:4px;}
+    #tab-gastos .table-scroll td:last-child .btn-sm{width:100%;font-size:9.5px;padding:5px 3px;white-space:normal;}
   }
 </style>
 </head>
@@ -1319,7 +1324,8 @@ function calcularComisionesPorMes(){
         const esCeprocenter = i<5;
         if(!esCeprocenter && utilidadModulo>0 && totalVentasModulo>0){
           const comision = 0.03 * (v.monto/totalVentasModulo) * utilidadModulo;
-          const mes = (v.fecha||'').slice(0,7) || 'Sin fecha';
+          const mesCrudo = (v.fecha||'').slice(0,7);
+          const mes = /^\d{4}-\d{2}$/.test(mesCrudo) ? mesCrudo : 'Sin fecha';
           if(!porMes[mes]) porMes[mes] = {};
           porMes[mes][v.asesor] = (porMes[mes][v.asesor]||0) + comision;
         }
